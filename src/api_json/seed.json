@@ -1,0 +1,47 @@
+[
+  {
+    "employeeId": "EMP001",
+    "firstName": "Fifi",
+    "lastName": "Adoko",
+    "fullName": "Fifi Adoko",
+    "role": "Graphic Designer",
+    "email": "fifi.adoko@vireworkplace.com",
+    "status": "active"
+  },
+  {
+    "employeeId": "EMP002",
+    "firstName": "Bless",
+    "lastName": "Lamptey",
+    "fullName": "Bless Lamptey",
+    "role": "Graphic Designer",
+    "email": "bless.lamptey@vireworkplace.com",
+    "status": "active"
+  },
+  {
+    "employeeId": "EMP003",
+    "firstName": "Maame Esi Fosua",
+    "lastName": "Quansah",
+    "fullName": "Maame Esi Fosua Quansah",
+    "role": "Admin Assistant",
+    "email": "maame.quansah@vireworkplace.com",
+    "status": "active"
+  },
+  {
+    "employeeId": "EMP004",
+    "firstName": "Akorfa",
+    "lastName": "Doe",
+    "fullName": "Akorfa Doe",
+    "role": "Social Media Manager",
+    "email": "akorfa.doe@vireworkplace.com",
+    "status": "active"
+  },
+  {
+    "employeeId": "EMP005",
+    "firstName": "Agnes",
+    "lastName": "Doe",
+    "fullName": "Agnes Doe",
+    "role": "Graphic Designer",
+    "email": "agnes.doe@vireworkplace.com",
+    "status": "active"
+  }
+]
