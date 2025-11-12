@@ -19,7 +19,7 @@ export const sendEmail = async ({
                                 }: EmailOptions) => {
     try {
         const data = await resend.emails.send({
-            from: "Cozy Oven <info@cozyoven.store>",
+            from: "Cozy Oven <noreply@cozyoven.store>",
             to: email,
             subject,
             text,

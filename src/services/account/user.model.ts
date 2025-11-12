@@ -4,6 +4,7 @@ export type User = Document & {
     _id: mongoose.Types.ObjectId;
     fullName: string;
     email: string;
+    phoneNumber: string;
     password: string; // null for social logins
     googleId: String;    // if signed in with Google
     profileImage: String;
@@ -24,6 +25,12 @@ const UserSchema: Schema<User> = new Schema(
             required: true,
             trim: true,
             index: true
+        },
+        phoneNumber: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
         },
         email: {
             type: String,

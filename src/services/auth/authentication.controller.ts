@@ -5,7 +5,8 @@ import UserModel, {User} from '../account/user.model';
 import generateOTP from '../../utils/OTP';
 import OTPVerification from './OTPVerification.model';
 import {CustomJwtPayload} from '../../types/authRequest';
-import {sendEmail} from '../../utils/email.transporter';
+import { sendEmail } from '../../utils/email.transporter';
+import { sendSMS } from "../../utils/sendSMS";
 import { sendNotification } from "../notifications/notificationMain.service";
 
 import redisClient from '../../config/redis';
@@ -28,13 +29,14 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
         const {
             fullName,
             email,
+            phoneNumber,
             password,
             role,
             isAccountDeleted
         } = req.body;
 
         //Validation
-        if (!fullName || !email ) {
+        if (!fullName || !email || !password ) {
             res.status(400).json({
                 success: false,
                 message: "First Name, Email, Phone Number are required"
@@ -102,6 +104,7 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
         const newUser: User = await UserModel.create({
             fullName,
             email,
+            phoneNumber,
             password: hashedPassword,
             role,
             isAccountDeleted
@@ -109,7 +112,7 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
 
         //Email HTML content 
         const emailText =
-` Hello ${newUser.fullName.split(' ')[0]},
+`Hello ${newUser.fullName.split(' ')[0]},
 We’re thrilled to have you join the Cozy Oven family — where every bite feels like home.  
 Your account has been successfully created, and you can now explore our range of freshly baked banana breads and special oven-to-door offers.
         
@@ -133,12 +136,15 @@ Thank you for choosing Cozy Oven — we can’t wait to bake something amazing f
             text: emailText,
         });
 
+        //Send SMS notification
+        const firstName = newUser.fullName.split(" ")[0];
+        const smsMessage = `Welcome to Cozy Oven, ${firstName}! Your account’s ready. Visit www.cozyoven.store to order your favorite banana bread today!`;
 
-        //SMS message
-        // await sendSMS({
-        //     to: phoneNumber,
-        //     message: `🍰 Welcome to Cozy Oven, ${firstName}! Explore fresh pastries & offers → www.cozyoven.store`
-        // });
+        //Fire and forget — no blocking response
+        await sendSMS({
+            recipient: [newUser.phoneNumber],
+            message: smsMessage,
+        });
 
         res.status(201).json({
             success: true,

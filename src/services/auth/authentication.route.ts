@@ -22,6 +22,7 @@ const router = express.Router();
  *             required:
  *               - fullName
  *               - email
+ *               - phoneNumber
  *               - password
  *             properties:
  *               fullName:
@@ -30,6 +31,9 @@ const router = express.Router();
  *               email:
  *                 type: string
  *                 example: "janedoe@gmail.com"
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "0205345678"
  *               role:
  *                 type: string
  *                 enum: ['Customer', 'Admin']
