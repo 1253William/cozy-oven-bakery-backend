@@ -1,5 +1,5 @@
 import express from "express";
-import {register, login, forgotPassword, verifyForgotPasswordOTP, resetPassword, verifyAccountOTP, resendAccountVerificationOTP, resendResetPasswordOTP} from "./authentication.controller";
+import {register, login, forgotPassword, verifyForgotPasswordOTP, resetPassword, resendResetPasswordOTP} from "./authentication.controller";
 import { otpRequestLimiter, otpVerifyLimiter, loginRateLimiter } from '../../middlewares/otpLimiter.middleware'
 
 const router = express.Router();
@@ -20,71 +20,24 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - firstName
- *               - lastName
- *               - userName
- *               - workId
- *               - phoneNumber
+ *               - fullName
  *               - email
- *               - dateOfBirth
- *               - gender
  *               - password
- *               - profileImage
- *               - jobTitle
- *               - role
- *               - department
- *               - employmentStatus
- *               - workStatus
  *             properties:
- *               firstName:
+ *               fullName:
  *                 type: string
- *                 example: "Jane"
- *               lastName:
- *                 type: string
- *                 example: "Doe"
- *               userName:
- *                 type: string
- *                 example: "jane.doe"
- *               workId:
- *                  type: string
- *                  example: VIRE-256848
- *               phoneNumber:
- *                 type: string
- *                 example: "+1234567890"
+ *                 example: "Jane Doe"
  *               email:
  *                 type: string
  *                 example: "janedoe@gmail.com"
- *               dateOfBirth:
- *                 type: string
- *                 example: "1990-01-01"
- *               gender:
- *                 type: string
- *                 example: "Female"
- *               department:
- *                 type: string
- *                 enum: ['Engineering', 'Design', 'Human Resources', 'Social Media', 'Customer Support']
- *                 example: "Engineering"
  *               role:
  *                 type: string
- *                 enum: ['Staff', 'Admin', 'Human Resource Manager']
- *               employmentStatus:
- *                 type: string
- *                 enum: ['Full-time', 'Part-time', 'Internship', 'Contract']
- *               workStatus:
- *                 type: string
- *                 enum: ['remote', 'in-person']
- *               profileImage:
- *                 type: string
- *                 example: "https://example.com/profile.jpg"
- *               jobTitle:
- *                 type: string
- *                 example: "Software Engineer"
- *               password:
+ *                 enum: ['Customer', 'Admin']
  *                 type: string
  *                 example: "SecurePass123!"
  *     responses:
  *       201:
- *         description: An account verification OTP has been sent to your email
+ *         description: Your account’s ready!
  *         content:
  *           application/json:
  *             schema:
@@ -95,7 +48,7 @@ const router = express.Router();
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: An account verification OTP has been sent to your email. Please check your inbox
+ *                   example: Your account’s ready
  *                 tempToken:
  *                   type: string
  *                   description: Temporary JWT token valid for 10 minutes
@@ -115,12 +68,12 @@ router.post('/signup', register);
 
 /**
  * @swagger
- * /api/v1/auth/otp/resend:
+ * /api/v1/auth/login:
  *   post:
  *     tags:
  *       - Authentication
- *     summary: Resend OTP for account verification
- *     description: Sends a new OTP to the user's email for account verification. OTP is valid for 10 minutes.
+ *     summary: Log in a user
+ *     description: Authenticates a user using their email and Password. If credentials are valid, a JWT token is returned.
  *     requestBody:
  *       required: true
  *       content:
@@ -129,157 +82,11 @@ router.post('/signup', register);
  *             type: object
  *             required:
  *               - email
+ *               - password
  *             properties:
  *               email:
  *                 type: string
- *                 format: email
- *                 example: johndoe@example.com
- *     responses:
- *       200:
- *         description: OTP successfully resent to user's email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: An OTP has been resent to your email. Please check your inbox.
- *                 tempToken:
- *                   type: string
- *                   description: Temporary JWT token valid for 10 minutes
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *       400:
- *         description: Email not provided
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Email is required to resend OTP
- *       404:
- *         description: User with provided email not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: User not found
- *       500:
- *         description: Internal server error
- */
-//@route POST /api/v1/auth/otp/resend
-//@desc Resend OTP for account verification
-//@access public
-router.post('/otp/resend', resendAccountVerificationOTP);
-
-/**
- * @swagger
- * /api/v1/auth/otp/verify-account:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Verify Account OTP
- *     description: Verifies the OTP sent to the user's email during signup and generates a unique Work ID.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - otp
- *             properties:
- *               otp:
- *                 type: string
- *                 example: "345678"
- *     responses:
- *       200:
- *         description: Account verified successfully and Work ID generated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Account verified! Your Work ID has been sent to your email."
- *                 workId:
- *                   type: string
- *                   example: "VIRE-123456"
- *       400:
- *         description: Invalid OTP, expired, or user not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "OTP not found or already used"
- *       401:
- *         description: Missing or malformed authorization token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Authorization token missing or malformed"
- *       500:
- *         description: Internal Server Error
- */
-//Controller for verifying Account Sign Up OTP
-//POST /api/v1/auth/otp/verify-account
-//@public
-router.post('/otp/verify-account', verifyAccountOTP);
-
-/**
- * @swagger
- * /api/v1/auth/login:
- *   post:
- *     tags:
- *       - Authentication
- *     summary: Log in a user
- *     description: Authenticates a user using their Work ID and Password. If credentials are valid, a JWT token is returned.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - workId
- *               - password
- *             properties:
- *               workId:
- *                 type: string
- *                 example: "VIRE-123456"
+ *                 example: "johndoe@gmail.com"
  *               password:
  *                 type: string
  *                 example: "SecurePassword123!"
@@ -306,29 +113,17 @@ router.post('/otp/verify-account', verifyAccountOTP);
  *                     _id:
  *                       type: string
  *                       example: "60c72b2f9b1e8d001f9d5a9e"
- *                     firstName:
+ *                     fullName:
  *                       type: string
  *                       example: "Jane"
- *                     lastName:
- *                       type: string
- *                       example: "Doe"
- *                     userName:
- *                       type: string
- *                       example: "jane.doe"
  *                     email:
  *                       type: string
  *                       example: "janedoe@example.com"
  *                     role:
  *                       type: string
- *                       example: "Staff"
- *                     department:
- *                       type: string
- *                       example: "Engineering"
- *                     jobTitle:
- *                       type: string
- *                       example: "Software Engineer"
+ *                       example: "Customer"
  *       400:
- *         description: Invalid Work ID or password
+ *         description: Invalid email or password
  *         content:
  *           application/json:
  *             schema:
@@ -368,7 +163,7 @@ router.post('/login',loginRateLimiter, login);
  *     tags:
  *       - Authentication
  *     summary: Forgot Password - Request OTP
- *     description: Sends a secure, time-limited 6-digit OTP to the user's email to reset their password. The OTP expires in 10 minutes. A temporary token is returned in the response for subsequent OTP verification.
+ *     description: Sends a secure, time-limited 5-digit OTP to the user's email to reset their password. The OTP expires in 10 minutes. A temporary token is returned in the response for subsequent OTP verification.
  *     requestBody:
  *       required: true
  *       content:
@@ -427,7 +222,7 @@ router.post('/forgot-password', otpRequestLimiter, forgotPassword);
  *     tags:
  *       - Authentication
  *     summary: Verify OTP for Password Reset
- *     description: Verifies the 6-digit OTP sent to the user’s email and returns a reset token valid for 15 minutes, which can be used to reset the password.
+ *     description: Verifies the 5-digit OTP sent to the user’s email and returns a reset token valid for 15 minutes, which can be used to reset the password.
  *     security:
  *       - bearerAuth: []
  *     requestBody:

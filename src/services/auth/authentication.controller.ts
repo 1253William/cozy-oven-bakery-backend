@@ -9,9 +9,6 @@ import {sendEmail} from '../../utils/email.transporter';
 import { sendNotification } from "../notifications/notificationMain.service";
 
 import redisClient from '../../config/redis';
-// import { getIO } from "../config/socketio";
-
-// const io = getIO();
 
 require('dotenv').config();
 
@@ -23,70 +20,36 @@ if (!ACCESS_TOKEN_SECRET) {
     throw new Error('ACCESS_TOKEN_SECRET is not defined in .env');
 }
 
-//Email whitelists - Allowed emails for Admins and HR
-const ADMIN_WHITELIST = [
-    "michael@vire.agency",
-    "nanag@vire.agency",
-    "vire.engineering@gmail.com",
-];
-
-const HR_WHITELIST = [
-    "tamoatengdadzie@gmail.com",
-];
-
-
 //@route POST /api/v1/auth/signup
 //@desc Sign Up User (Create User and Hash Password)
 //@access Public
 export const register = async ( req: Request, res: Response): Promise<void> => {
     try {
         const {
-            firstName,
-            lastName,
-            phoneNumber,
+            fullName,
             email,
-            dateOfBirth,
-            gender,
             password,
-            profileImage,
-            jobTitle,
             role,
-            department,
-            employmentStatus,
-            workStatus,
-            isAccountDeleted } = req.body;
-            let userName = req.body.userName;
+            isAccountDeleted
+        } = req.body;
 
         //Validation
-        if (!firstName || !lastName || !phoneNumber || !email ||!dateOfBirth || !gender || !password || !jobTitle) {
+        if (!fullName || !email ) {
             res.status(400).json({
                 success: false,
-                message: "First Name, Last Name, Email, Phone Number, Date of Birth, Gender, Password, Job Title, Role are required"
+                message: "First Name, Email, Phone Number are required"
             });
             return
         }
 
-        //Role restriction logic
-        if (role === "Admin" && !ADMIN_WHITELIST.includes(email)) {
+        //Email domain restriction for Admins
+        const ALLOWED_ADMIN_DOMAIN = "cozyoven.store";
+
+        //Validate Admin registration domain
+        if (role === "Admin" && !email.toLowerCase().endsWith(`@${ALLOWED_ADMIN_DOMAIN}`)) {
             res.status(403).json({
                 success: false,
-                message: "Unauthorized: You can not register as an Admin",
-            });
-            return;
-        }
-
-        if (role === "Human Resource Manager" && !HR_WHITELIST.includes(email)) {
-            res.status(403).json({
-                success: false,
-                message: "Unauthorized: You can not register as an HR",
-            });
-            return;
-        }
-
-        if (role !== "Admin" && role !== "Human Resource Manager" && role !== "Staff") {
-            res.status(400).json({
-                success: false,
-                message: "Invalid role. Only Admin, Human Resource Manager, or Staff are allowed",
+                message: `Unauthorized: Only users with an @${ALLOWED_ADMIN_DOMAIN} email can register as Admin.`,
             });
             return;
         }
@@ -99,36 +62,12 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
             return
         }
 
-        //Check if date of birth is in the past
-        const referenceDate = new Date(); 
-        const minDob = new Date(referenceDate);
-        minDob.setFullYear(minDob.getFullYear() - 15);
-
-        const dob = new Date(dateOfBirth);
-        if (dob > minDob) {
-            res.status(400).json({
-                success: false,
-                message: "User must be at least 15 years old as of the reference date"
-            });
-            return;
-        }
-
         //Check if email is valid
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             res.status(400).json({
                 success: false,
                 message: "Invalid email format"
-            });
-            return;
-        }
-
-        //Check if phone number is valid
-        const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
-        if (!phoneRegex.test(phoneNumber)) {
-            res.status(400).json({
-                success: false,
-                message: "Invalid phone number format"
             });
             return;
         }
@@ -155,109 +94,55 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
             return;
         }
 
-         //Check for existing phone number
-        const existingPhone = await UserModel.findOne({ phoneNumber });
-        if (existingPhone) {
-            res.status(400).json({
-                success: false,
-                message: "Phone number already exists. Please use a different number."
-            });
-            return;
-        }
-
         //Hash Password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        //Generate unique username
-        let generatedUserName = '@' + firstName.toLowerCase().replace(/\s+/g, '') + Math.floor(1000 + Math.random() * 9000);
-                let counter = 1;
-        while (await UserModel.findOne({ userName })) {
-            userName = `@${firstName.toLowerCase().replace(/\s+/g, '')}${counter++}`;
-        }
-
         //Create New User
         const newUser: User = await UserModel.create({
-            firstName,
-            lastName,
+            fullName,
             email,
             password: hashedPassword,
             role,
-            userName: generatedUserName,
-            profileImage,
-            phoneNumber,
-            dateOfBirth,
-            gender,
-            jobTitle,
-            department,
-            employmentStatus,
-            workStatus,
             isAccountDeleted
         });
 
-        const otp = generateOTP();
-        const hashedOtp = await bcrypt.hash(otp, 10);
-
-        //Save OTP to the database
-        await new OTPVerification({
-            userId: newUser._id,
-            email: email,
-            otp: hashedOtp,
-            createdAt: Date.now(),
-            expiresAt: Date.now() + 10 * 60 * 1000,
-        }).save();
-
-        const tempToken = jwt.sign(
-        { userId: newUser._id },
-        process.env.ACCESS_TOKEN_SECRET!,
-        { expiresIn: "10m" }
-        );
-
         //Email HTML content 
         const emailText =
-` Hello ${newUser.firstName},
-Welcome to Vire Workplace! 🎉
-
-To complete your account setup, please use the One-Time Password (OTP) below to verify your account:
- 🔐 Your OTP Code: ${otp}
+` Hello ${newUser.fullName.split(' ')[0]},
+We’re thrilled to have you join the Cozy Oven family — where every bite feels like home.  
+Your account has been successfully created, and you can now explore our range of freshly baked banana breads and special oven-to-door offers.
         
  ------------------------
         
-This code is valid for the next 10 minutes. Please do not share this code with anyone for security reasons.
+Here’s what you can do next:
+🛒 Browse and order your favorite treats from your dashboard
+⭐ Save favorites and get updates on special packages
+🚚 Track your orders in real time
 
-Once verified, you’ll receive your unique Work ID for all future logins.
+Go to My Account: https://cozyoven.store/login
 
-Need help? Feel free to contact us anytime. Toll free: 0800-123-4567 
-
-Thank you for joining Vire Workplace!
+Thank you for choosing Cozy Oven — we can’t wait to bake something amazing for you! 
         
-Vire Workplace Team
-Modern Workplace.`;
-
+©Cozy Oven Store. All rights reserved
+`;
+        //Email message
         await sendEmail({
             email: newUser.email,
-            subject: "🎉 Sign Up Successful! Verify Your Vire Workplace Account",
+            subject: "🎉 Welcome to Cozy Oven — Freshly baked banana bread happiness awaits!",
             text: emailText,
         });
 
-        //Email Notification
-//         await sendNotification({
-//         roles: ["Admin", "Human Resource Manager"],
-//         title: "🆕 New User Onboarding Notification",
-//         message: `A new user has joined Vire Workplace: ${newUser.firstName} ${newUser.lastName} has successfully signed up. 
 
-// Vire Workplace Team
-// Modern Workplace.`,
-//         priority: "high",
-//         type: "System",
-//         channels: ["socket", "email"],
-//         emails: ["admin@vire.com", "hr@vire.com", "williamofosuparwar@gmail.com"], // fallback email if needed
-//         });
+        //SMS message
+        // await sendSMS({
+        //     to: phoneNumber,
+        //     message: `🍰 Welcome to Cozy Oven, ${firstName}! Explore fresh pastries & offers → www.cozyoven.store`
+        // });
 
         res.status(201).json({
             success: true,
-            message: "An account verification OTP has been sent to your email. Please check your inbox.",
-            tempToken: tempToken
+            message: "Your account’s ready.",
         });
 
     } catch (error: unknown) {
@@ -267,187 +152,6 @@ Modern Workplace.`;
     }
 }
 
-
-//Controller for verifying Account Sign Up OTP
-//POST /api/v1/auth/otp/verify-account
-//@public
-export const verifyAccountOTP = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { otp } = req.body;
-       const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            res.status(401).json({ success: false, message: 'Authorization token missing or malformed' });
-            return;
-        }
-
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!);
-        const userId = (decoded as { userId: string }).userId;
-        if (!otp) {
-            res.status(400).json({ success: false, message: 'OTP is required' });
-            return;
-        }
-
-        const otpRecord = await OTPVerification.findOne({ userId });
-        if (!otpRecord) {
-            res.status(400).json({ success: false, message: 'OTP not found or already used'});
-            return;
-        }
-
-        if (otpRecord.expiresAt.getTime() < Date.now()) {
-            await OTPVerification.deleteMany({ userId });
-            res.status(400).json({ success:false, message: "OTP has expired. Request a new one." });
-            return;
-        }
-
-        const user = await UserModel.findById(otpRecord.userId);
-        if (!user) {
-            res.status(400).json({ success: false, message: 'User not found' });
-            return;
-        }
-
-        const validOtp = await bcrypt.compare(otp, otpRecord.otp);
-        if (!validOtp) {
-            res.status(400).json({ success: false, message: 'Invalid OTP' });
-            return;
-        }
-
-         if(user.isAccountVerified){
-            res.status(200).json({
-                success: false,
-                message: "Account already verified."
-            });
-            return;
-        }
-
-        //Generate unique Work ID
-        const randomDigits = Math.floor(100000 + Math.random() * 900000);
-        const workIdPlain = `VIRE-${randomDigits}`;
-    
-        user.workId = workIdPlain;
-        user.isAccountVerified = true;
-       
-        await user.save();
-
-        await OTPVerification.deleteMany({ userId: user._id });
-
-        //Send Welcome Email
-        const emailText = `
-🎉 Welcome to Vire Workplace, ${user.firstName.split(' ')[0]}!
-
-Your account is now active. Here are your login details:
-
-Employee Work ID: ${workIdPlain}
-Department: ${user.department || 'N/A'}
-Job Title: ${user.jobTitle}
-
-Login Link: https://workplace.vire.agency
-
-Note: For security reasons, we never store your password. Use your Employee ID and password to log in.
-
-For any issues, feel free to contact us anytime. Toll free: 0800-123-4567 
-
-Thank you,  
-Vire Workplace Team`;
-
-        await sendEmail({
-            email: user.email,
-            subject: "🎉 Welcome to Vire Workplace! Your Account Details",
-            text: emailText,
-        });
-
-        res.status(200).json({
-            success: true,
-            message: "Account verified! Your Work ID has been sent to your email.",
-        });
-
-    }catch (error: unknown) {
-        console.log({message: "Error verifying OTP:", error: error});
-        res.status(500).json({success: false, error: "Internal Server Error"});
-        return
-    }
-}
-
-
-//@route POST /api/v1/auth/otp/resend
-//@desc Resend OTP for account verification
-//@access Public
-export const resendAccountVerificationOTP = async (req: Request, res: Response): Promise<void> => {
-    try {
-          const { email } = req.body;
-        if (!email) {
-            res.status(400).json({ success: false, message: 'Email is required to resend OTP' });
-            return;
-        }
-
-        const user = await UserModel.findOne({email});
-        if (!user) {
-            res.status(404).json({ success: false, message: 'User not found' });
-            return;
-        }
-
-        // Clean up previous OTPs
-        await OTPVerification.deleteMany({ userId: user._id });
-
-        const otp = generateOTP();
-        const hashedOtp = await bcrypt.hash(otp, 10);
-
-        await new OTPVerification({
-            userId: user._id,
-            email: user.email,
-            otp: hashedOtp,
-            createdAt: Date.now(),
-            expiresAt: Date.now() + 10 * 60 * 1000,
-        }).save();
-
-        
-        const tempToken = jwt.sign(
-        { userId: user._id },
-        process.env.ACCESS_TOKEN_SECRET!,
-        { expiresIn: "10m" }
-        );
-
- //Email HTML content 
-        const emailText =
-` Hello ${user.firstName},
-Welcome to Vire Workplace! 🎉
-
-To complete your account setup, please use the One-Time Password (OTP) below to verify your account:
- 🔐 Your OTP Code: ${otp}
-        
- ------------------------
-        
-This code is valid for the next 10 minutes. Please do not share this code with anyone for security reasons.
-
-Once verified, you’ll receive your unique Work ID for all future logins.
-
-Need help? Feel free to contact us anytime. Toll free: 0800-123-4567 
-
-Thank you for joining Vire Workplace!
-        
-Vire Workplace Team
-Modern Workplace.`;
-
-    await sendEmail({
-            email: user.email,
-            subject: "🎉 One Time Password (OTP) for Account Verification",
-            text: emailText,
-        });
-
-        res.status(200).json({
-            success: true,
-            message: "An OTP has been resent to your email. Please check your inbox.",
-            tempToken: tempToken
-        });
-
-    } catch (error: unknown) {
-        console.log({message: "Error resending verification account OTP", error: error});
-        res.status(500).json({success: false, error: "Internal Server Error"});
-        return
-    }
-}
-
-
 //@route POST /api/v1/auth/login
 //@desc Login User (JWT authentication with access token)
 //@access Public
@@ -455,10 +159,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   const start = Date.now();
 
   try {
-    const { workId, password } = req.body;
+    const { email, password } = req.body;
 
     //Validation
-    if (!workId || !password) {
+    if (!email || !password) {
       res.status(400).json({
         success: false,
         message: "All fields are required"
@@ -466,25 +170,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const isValidWorkId = (id: string): boolean => {
-      const regex = /^VIRE-\d{6,}$/i;
-      return regex.test(id);
-    };
-
-    if (!isValidWorkId(workId)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid Work ID format."
-      });
-      return;
-    }
-
     //Query MongoDB for user
-    const matchedUser = await UserModel.findOne({ workId }).select("+password");
+    const matchedUser = await UserModel.findOne({ email }).select("+password");
     if (!matchedUser) {
       res.status(400).json({
         success: false,
-        message: "User not found with the provided Work ID"
+        message: "User not found with the provided email"
       });
       return;
     }
@@ -520,7 +211,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     );
 
     //Prepare safe user object
-    const { password: _, workId: __, ...safeUser } = matchedUser.toObject();
+    const { password: _, ...safeUser } = matchedUser.toObject();
 
     //Log processing time
     const elapsedTime = Date.now() - start;
@@ -581,7 +272,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
         );
 
         const emailText = `
-Hello ${user.firstName},
+Hello ${user.fullName},
 
 You requested to reset your password.
 
@@ -590,7 +281,8 @@ You requested to reset your password.
 This OTP expires in 10 minutes. If you didn't request this, ignore this email.
 
 Thank you,
-Vire Workplace Team
+
+©Cozy Oven Store. All rights reserved
         `;
 
         await sendEmail({
@@ -729,7 +421,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
         //Send confirmation email
         const emailText =
  `
-Hello ${user.firstName},
+Hello ${user.fullName},
 
 We wanted to let you know that your account password was successfully changed.
 
@@ -738,8 +430,9 @@ If you made this change, no further action is needed.
 Didn’t request this change?
 If you did not perform this action, please contact our support team immediately to secure your account. Toll free: 0800-123-4567 
 
-Thank you for using Vire Workplace,
-The Vire Workplace Team`;
+Thank you.
+
+©Cozy Oven Store. All rights reserved`;
 
         await sendEmail({
             email: user.email,
@@ -752,7 +445,6 @@ The Vire Workplace Team`;
             message: "Password reset successfully. You can now log in with your new password.",
         })
         return;
-
 
     }catch (error: unknown) {
         console.log({message: "Error resetting password:", error: error});
@@ -793,7 +485,6 @@ export const resendResetPasswordOTP = async (req: Request, res: Response): Promi
             expiresAt: Date.now() + 10 * 60 * 1000,
         }).save();
 
-        
         const tempToken = jwt.sign(
         { userId: user._id },
         process.env.ACCESS_TOKEN_SECRET!,
@@ -802,7 +493,7 @@ export const resendResetPasswordOTP = async (req: Request, res: Response): Promi
 
  //Email HTML content 
         const emailText =
-` Hello ${user.firstName},
+` Hello ${user.fullName},
 You requested to reset your password.
 🔐 Your OTP Code: ${otp}
 
@@ -811,10 +502,10 @@ If you didn't request this, ignore this email.
 Once verified, you’ll be able to reset your password.
 
 Need help? Feel free to contact us anytime. Toll free: 0800-123-4567
-Thank you for using Vire Workplace!
 
-Vire Workplace Team
-Modern Workplace.
+Thank you!
+
+©Cozy Oven Store. All rights reserved.
 `;
 
     await sendEmail({

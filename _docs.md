@@ -175,3 +175,21 @@ Firebase
 Deployment
 Render
 
+//Create email for:
+noreply@cozyoven.store 
+use for email messaging
+
+//Tests for concurrency, idempotency, and security
+
+//Unit Test and E-2-E Test
+
+//////Temporary
+Folders:
+00_Health
+01_Auth (register, login, verify)
+02_Products (upload, create, list, update, delete)
+03_Orders (create, get, update status)
+04_Offline_Sync (sync, idempotency tests)
+05_Analytics
+06_Webhooks
+99_Utilities (seed DB, clear DB, generate JWT)

@@ -4,19 +4,18 @@ const options = {
     swaggerDefinition: {
         openapi: "3.0.0",
        info: {
-        title: "Vire Workplace API Documentation",
+        title: "cozy-oven-bakery-backend",
         version: "1.0.0",
-        description: "Backend API for Vire Workplace employee and workflow automation system.",
+        description: "A Node.js + Express backend powering Cozy Oven’s bakery store.",
         },
         contact: {
-            name: "The Vire Agency",
-            title: "Project Maintainer: Vire Agency Engineering Team",
-            url: "https://www.vire.agency",
-            email: "vireworkspace@gmail.com",
+            name: "Partechnologies And Consult",
+            title: "Project Maintainer: Partechnologies And Consult",
+            email: "williamofosu677@gmail.com",
         },
         license: {
             name: "MIT License",
-            url: "https://github.com/vireagency/vireworkplace-backend.git#readme",
+            url: "https://github.com/1253William/cozy-oven-bakery-backend.git",
         },
         servers: [
             {
@@ -24,7 +23,7 @@ const options = {
                 description: "Development server",
             },
             {
-                url: "https://api.vire.agency",
+                url: "https://api.cozyoven.store",
                 description: "Live server"
             }
         ],

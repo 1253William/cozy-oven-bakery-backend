@@ -8,10 +8,9 @@ import SwaggerSpec from './services/swagger';
 import rootRouter from "./routes/index.route";
 import connectDB from "./config/db";
 import './workers/otpCleaner';
-import { startEmployeeCacheJob } from "./workers/employeeCacheJob";
+// import { startStoreCacheJob } from "./workers/storeCacheJob";
 import http from 'http';
-import { initSocket } from './config/socketio';
-import { debugStreams } from './config/checkStreams';
+
 
 dotenv.config();
 
@@ -22,9 +21,6 @@ const app = express();
 
 //Create an HTTP server for Socket.IO
 const server = http.createServer(app);
-
-//Init socket server
-initSocket(server);
 
 
 //Middlewares
@@ -78,20 +74,19 @@ app.use("/api/v1", rootRouter);
 app.get('/', (_req, res) => {
     res.status(200).json({ 
         success: true,
-        message: 'Vire Workplace API is running....',
+        message: 'Cozy Oven API is running....',
         version: '1.0.0',
         year: new Date().getFullYear()
     });
 });
-//Debug Redis Streams
-app.use('/debug/streams', debugStreams);
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
 //start employee cache cron job
-startEmployeeCacheJob();
+// startStoreCacheJob();
 
 const PORT = parseInt(process.env.PORT as string, 10) || 5000;
 

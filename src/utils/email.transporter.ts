@@ -19,7 +19,7 @@ export const sendEmail = async ({
                                 }: EmailOptions) => {
     try {
         const data = await resend.emails.send({
-            from: "Vire Workplace Support Team <engage@vire.agency>",
+            from: "Cozy Oven <info@cozyoven.store>",
             to: email,
             subject,
             text,
