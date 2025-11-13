@@ -33,7 +33,6 @@ export const userData = async (req: AuthRequest, res: Response): Promise<void> =
     //Fallback to MongoDB if cache miss
     const user = await UserModel.findById(userId)
       .select("-password -__v -passwordChangedAt -createdAt -updatedAt")
-      .populate("employeeProfile")
       .lean();
 
     if (!user) {

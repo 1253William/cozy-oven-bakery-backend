@@ -7,7 +7,7 @@ import userRouter from "../services/account/user.route";
 // import performanceRouter from "./performance.route";
 // import evaluationRouter from "./evaluations.route";
 // import reportRouter from "./report.routes";
-// import settingsRouter from "./settings.route";
+import settingsRouter from "../services/account/profile.route";
 // import searchRouter from "../services/globals/search.routes";
 // import inventoryRouter from "../services/inventory/inventory.route";
 // import notificationRouter from "./notification.route";
@@ -31,8 +31,8 @@ rootRouter.use('/status',userRouter);
 // rootRouter.use('/dashboard', reportRouter);
 // rootRouter.use('/dashboard', inventoryRouter);
 
-//Settings routes
-// rootRouter.use('/settings', settingsRouter);
+//Account routes
+rootRouter.use('/account', settingsRouter);
 
 //Search routes
 // rootRouter.use('/search', searchRouter);

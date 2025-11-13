@@ -33,18 +33,18 @@ import { authorizedRoles } from "../../middlewares/roles.middleware";
  *                     _id:
  *                       type: string
  *                       example: "642fc5365ebf3ab83d7d501a"
- *                     firstName:
+ *                     fullName:
  *                       type: string
- *                       example: "Jane" 
- *                     lastName:
+ *                       example: "Jane Doe"
+ *                     phoneNumber:
  *                       type: string
- *                       example: "Doe"
+ *                       example: "+233456789012"
  *                     email:
  *                       type: string
  *                       example: "jane@example.com"
  *                     role:
  *                       type: string
- *                       example: "Staff"
+ *                       example: "Customer"
  *                     isAccountDeleted:
  *                        type: boolean
  *                        example: false
@@ -67,7 +67,7 @@ import { authorizedRoles } from "../../middlewares/roles.middleware";
 //@route GET /api/v1/status/profile
 //@desc Get Data/Profile/Details of Logged-in user (Get your own profile)
 //@access private
-router.get('/profile', authMiddleware, authorizedRoles("Staff", "Admin", "Human Resource Manager"), userData);
+router.get('/profile', authMiddleware, authorizedRoles("Customer", "Admin"), userData);
 
 
 export default router;

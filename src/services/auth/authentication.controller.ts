@@ -282,7 +282,7 @@ Hello ${user.fullName},
 
 You requested to reset your password.
 
-🔐 OTP Code: ${otp}
+OTP Code: ${otp}
 
 This OTP expires in 10 minutes. If you didn't request this, ignore this email.
 
@@ -434,7 +434,7 @@ We wanted to let you know that your account password was successfully changed.
 If you made this change, no further action is needed.
 
 Didn’t request this change?
-If you did not perform this action, please contact our support team immediately to secure your account. Toll free: 0800-123-4567 
+If you did not perform this action, please contact our support team immediately to secure your account. Toll free: +233-0209-136-143 
 
 Thank you.
 
@@ -501,13 +501,13 @@ export const resendResetPasswordOTP = async (req: Request, res: Response): Promi
         const emailText =
 ` Hello ${user.fullName},
 You requested to reset your password.
-🔐 Your OTP Code: ${otp}
+Your OTP Code: ${otp}
 
 This code is valid for the next 10 minutes. Please do not share this code with anyone for security reasons.
 If you didn't request this, ignore this email.
 Once verified, you’ll be able to reset your password.
 
-Need help? Feel free to contact us anytime. Toll free: 0800-123-4567
+Need help? Feel free to contact us anytime. Toll free: +233-0209-136-143
 
 Thank you!
 

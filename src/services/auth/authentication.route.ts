@@ -1,6 +1,7 @@
 import express from "express";
 import {register, login, forgotPassword, verifyForgotPasswordOTP, resetPassword, resendResetPasswordOTP} from "./authentication.controller";
 import { otpRequestLimiter, otpVerifyLimiter, loginRateLimiter } from '../../middlewares/otpLimiter.middleware'
+import { apiLimiter } from '../../middlewares/apiLimiter.middleware'
 
 const router = express.Router();
 
@@ -421,9 +422,9 @@ router.put('/otp/reset', resetPassword);
  *                   example: Internal Server Error
  */
 //@route POST /api/v1/auth/forgot-password/otp/resend
-//@desc Resend  Password Reset OTP
+//@desc Resend Password Reset OTP
 //@access public
-router.post('/forgot-password/otp/resend', resendResetPasswordOTP)
+router.post('/forgot-password/otp/resend', apiLimiter, resendResetPasswordOTP)
 
 
 export default router;

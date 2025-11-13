@@ -20,6 +20,7 @@ export const sendEmail = async ({
     try {
         const data = await resend.emails.send({
             from: "Cozy Oven <noreply@cozyoven.store>",
+            replyTo: "Cozy Oven <info@cozyoven.store>",
             to: email,
             subject,
             text,

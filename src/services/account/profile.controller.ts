@@ -60,22 +60,9 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     const {
-      firstName,
-      lastName,
+      fullName,
+      email,
       phoneNumber,
-      dateOfBirth,
-      profileImage,
-      jobTitle,
-      department,
-      role,
-      personalInfo,
-      contactInfo,
-      emergencyContact,
-      employmentDetails,
-      qualifications,
-      documents,
-      healthInfo,
-      workSchedule,
     } = req.body;
 
     //Ensure User exists
@@ -89,76 +76,16 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     await User.findByIdAndUpdate(
       userId,
       {
-        ...(firstName && { firstName }),
-        ...(lastName && { lastName }),
+        ...(fullName && { fullName }),
+        ...(email && { email }),
         ...(phoneNumber && { phoneNumber }),
-        ...(profileImage && { profileImage }),
-        ...(dateOfBirth && { dateOfBirth }),
-        ...(jobTitle && { jobTitle }),
-        ...(department && { department }),
-        ...(role && { role }),
       },
       { new: true, runValidators: true }
     );
 
-    //Handle EmployeeProfile (create if missing)
-    let employeeProfileId = user.employeeProfile;
-
-    if (!employeeProfileId) {
-      //Create a new employee profile doc and link it to the user
-      const newProfile = await EmployeeProfile.create({ user: userId });
-      user.employeeProfile = newProfile._id as import("mongoose").Types.ObjectId;
-      await user.save();
-      employeeProfileId = newProfile._id as import("mongoose").Types.ObjectId;
-    }
-
-    //Build dot-notation update object
-    const updateData: Record<string, any> = {};
-
-    if (personalInfo) {
-      if (personalInfo.nationality) updateData["personalInfo.nationality"] = personalInfo.nationality;
-      if (personalInfo.maritalStatus) updateData["personalInfo.maritalStatus"] = personalInfo.maritalStatus;
-      if (personalInfo.personalPronouns) updateData["personalInfo.personalPronouns"] = personalInfo.personalPronouns;
-    }
-    if (contactInfo) {
-      if (contactInfo.email) updateData["contactInfo.email"] = contactInfo.email;
-      if (contactInfo.phoneNumber) updateData["contactInfo.phoneNumber"] = contactInfo.phoneNumber;
-      if (contactInfo.address) updateData["contactInfo.address"] = contactInfo.address;
-      if (contactInfo.city) updateData["contactInfo.city"] = contactInfo.city;
-      if (contactInfo.regionOrState) updateData["contactInfo.regionOrState"] = contactInfo.regionOrState;
-      if (contactInfo.postalCode) updateData["contactInfo.postalCode"] = contactInfo.postalCode;
-    }
-    if (emergencyContact) {
-      Object.entries(emergencyContact).forEach(([key, val]) => {
-        updateData[`emergencyContact.${key}`] = val;
-      });
-    }
-    if (employmentDetails) {
-      Object.entries(employmentDetails).forEach(([key, val]) => {
-        updateData[`employmentDetails.${key}`] = val;
-      });
-    }
-    if (qualifications) updateData["qualifications"] = qualifications;
-    if (documents) updateData["documents"] = documents;
-    if (healthInfo) {
-      Object.entries(healthInfo).forEach(([key, val]) => {
-        updateData[`healthInfo.${key}`] = val;
-      });
-    }
-    if (workSchedule) updateData["workSchedule"] = workSchedule;
-
-    //Update EmployeeProfile
-    if (Object.keys(updateData).length > 0) {
-      await EmployeeProfile.findByIdAndUpdate(employeeProfileId, { $set: updateData }, { new: true, runValidators: true });
-    }
-
-    //Return full merged profile
-    const fullUser = await User.findById(userId).populate("employeeProfile").lean();
-
     res.status(200).json({
       success: true,
-      message: "User profile updated successfully.",
-      data: fullUser,
+      message: "User profile updated successfully."
     });
     return;
 
