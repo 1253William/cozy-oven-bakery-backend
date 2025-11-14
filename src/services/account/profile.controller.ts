@@ -1,6 +1,6 @@
 import {Request, Response} from 'express';
 import User from './user.model';
-import { EmployeeProfile } from '../customers/employee.model';
+import Order from "../orders/order.model";
 import { AuthRequest } from '../../types/authRequest'
 import { cloudinaryHelper } from '../../utils/helpers/cloudinaryHelper';
 import bcrypt from "bcryptjs";
@@ -47,6 +47,7 @@ export const updateProfilePicture = async (req: AuthRequest, res: Response) => {
   }
 };
 
+//******** Account Details **********//
 
 // @route PATCH /api/v1/settings/profile
 // @desc Update logged-in user's profile & employee profile
@@ -96,8 +97,9 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+//******** Account Password **********//
 
-//@route PATCH /api/v1/settings/profile/password
+//@route PATCH /api/v1/account/password
 //@desc Update Password of Logged-in user
 //@access Private
 export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -167,8 +169,9 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
     }
 };
 
+//******** Account Deletion **********//
 
-//@route DELETE /api/v1/settings/account/delete
+//@route DELETE /api/v1/account/delete
 //@desc Deactivate/Delete account (Soft Delete)
 //@access Private
 export const deleteAccount = async(req: AuthRequest, res: Response): Promise<void> => {
@@ -199,6 +202,93 @@ export const deleteAccount = async(req: AuthRequest, res: Response): Promise<voi
 
     }catch (error) {
         console.log({ message: "Error deleting account", error });
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+        return;
+    }
+}
+
+//******** Customer Order History **********//
+
+//@route GET /api/v1/account/order-history
+//@desc Get Order History of Logged-in user
+//@access Private
+export const customerOrderHistory = async(req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({success: false, message: "Unauthorized: User not authenticated."})
+            return;
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+            return;
+        }
+
+        // Pagination
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const cacheKey = `order-history:${userId}:page:${page}`;
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            res.status(200).json({
+                success: true,
+                message: "Order history fetched (cache hit)",
+                data: JSON.parse(cached),
+            });
+            return;
+        }
+
+        //Get Order History of User
+        const [orders, total] = await Promise.all([
+            Order.find({ userId })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Order.countDocuments({ userId }),
+        ]);
+        if(!orders){
+            res.status(404).json({
+                success: false,
+                message: "Your order history is empty. Please place an order to view your order history."
+            });
+            return;
+        }
+
+        const responseData = {
+            orders,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+
+        await redisClient.setex(cacheKey, 300, JSON.stringify(responseData));
+
+        res.status(200).json({
+            success: true,
+            message: "order history fetched successfully.",
+            data: {
+                user: {
+                    id: user._id,
+                    firstName: user.fullName,
+                },
+                orders: responseData
+            },
+        });
+        return;
+
+    }catch (error) {
+        console.log({ message: "Error fetching order history", error });
         res.status(500).json({ success: false, error: "Internal Server Error" });
         return;
     }

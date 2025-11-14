@@ -7,7 +7,7 @@ export interface IProduct extends Document {
     productId: mongoose.Types.ObjectId;
     productName: string;
     productThumbnail: string; // Cloudinary URL
-    productDescription?: string;
+    productDetails: string;
     price: number;
     productCategory: "Family Size" | "Midi Size" | "Flight Box 3-set" | "Flight Box 4-set" | "Special Package or Offer";
     productStatus: "in stock" | "low stock" | "out of stock";
@@ -36,7 +36,7 @@ const ProductSchema: Schema<IProduct> = new Schema(
             type: String,
             required: [true, "Product thumbnail URL is required"],
         },
-        productDescription: {
+        productDetails: {
             type: String,
             trim: true,
             maxlength: 500,
@@ -85,7 +85,7 @@ const ProductSchema: Schema<IProduct> = new Schema(
 //Indexes for performance
 ProductSchema.index({ productId: 1 });
 ProductSchema.index({ productCategory: 1 });
-ProductSchema.index({ productName: "text", productDescription: "text" });
+ProductSchema.index({ productName: "text", productDetails: "text" });
 
 const ProductModel: Model<IProduct> = mongoose.model<IProduct>("Product", ProductSchema);
 export default ProductModel;

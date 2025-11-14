@@ -85,7 +85,7 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
 
             res.status(200).json({
                 success: true,
-                message: 'Account restored successfully. Please log in with your password and work ID.',
+                message: 'Account restored successfully. Please log in with your new password and email.',
             });
             return;
             }
@@ -93,6 +93,14 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
                 success: false,
                 message: 'User already exists, try logging in.',
             });
+            return;
+        }
+        const existingPhoneNumber = await UserModel.findOne({ phoneNumber })
+        if (existingPhoneNumber){
+            res.status(400).json({
+                success: false,
+                message: "Phone Number already taken. Please try another one."
+            })
             return;
         }
 

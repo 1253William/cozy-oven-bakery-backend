@@ -157,10 +157,10 @@ router.patch('/password', authMiddleware, authorizedRoles("Customer", "Admin"), 
 
 /**
  * @swagger
- * /api/v1/settings/account/delete:
+ * /api/v1/account/delete:
  *   delete:
  *     tags:
- *       - Settings
+ *       - Account
  *     summary: Delete (soft delete) user account
  *     description: Marks the authenticated user's account as deleted.
  *     security:
@@ -184,9 +184,9 @@ router.patch('/password', authMiddleware, authorizedRoles("Customer", "Admin"), 
  *       500:
  *         description: Internal Server Error
  */
-//@route DELETE	/api/v1/settings/account/delete
+//@route DELETE	/api/v1/account/delete
 //@desc Deactivate/Delete account (Soft Delete)
 //@access private
-router.delete('/account/delete', authMiddleware, authorizedRoles("Staff", "Admin", "Human Resource Manager"), deleteAccount);
+router.delete('/delete', authMiddleware, authorizedRoles("Customer", "Admin"), deleteAccount);
 
 export default router;
