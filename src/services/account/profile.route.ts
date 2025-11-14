@@ -1,64 +1,11 @@
 import express from "express";
 import { authMiddleware } from "../../middlewares/authentication.middleware";
 import { authorizedRoles } from "../../middlewares/roles.middleware";
-import { upload } from "../../middlewares/upload.middleware";
-import { changePassword, deleteAccount, updateProfile, updateProfilePicture } from "./profile.controller";
+// import { upload } from "../../middlewares/upload.middleware";
+import { changePassword, deleteAccount, updateProfile } from "./profile.controller";
 
 
 const router = express.Router();
-/**
- //  * @swagger
- //  * /api/v1/settings/profile-image:
- //  *   patch:
- //  *     tags:
- //  *       - Settings
- //  *     summary: Update user's profile image
- //  *     description: Uploads and updates the authenticated user's profile picture. The previous image is deleted from Cloudinary before saving the new one.
- //  *     security:
- //  *       - bearerAuth: []
- //  *     requestBody:
- //  *       required: true
- //  *       content:
- //  *         multipart/form-data:
- //  *           schema:
- //  *             type: object
- //  *             properties:
- //  *               file:
- //  *                 type: string
- //  *                 format: binary
- //  *                 description: Profile image file to upload
- //  *     responses:
- //  *       200:
- //  *         description: Profile picture updated successfully.
- //  *         content:
- //  *           application/json:
- //  *             schema:
- //  *               type: object
- //  *               properties:
- //  *                 success:
- //  *                   type: boolean
- //  *                   example: true
- //  *                 message:
- //  *                   type: string
- //  *                   example: Profile picture updated successfully
- //  *                 data:
- //  *                   type: object
- //  *                   description: Updated user object
- //  *       400:
- //  *         description: No file uploaded or unauthorized
- //  *       401:
- //  *         description: Unauthorized
- //  *       404:
- //  *         description: User not found
- //  *       500:
- //  *         description: Internal Server Error
- //  */
-// //@route PATCH /api/v1/settings/profile-image
-// //@desc Update profile photo (profile image) of Logged-in user
-// //@access private
-// router.patch('/profile-image', authMiddleware, authorizedRoles("Staff", "Admin", "Human Resource Manager"),
-//   upload.single("file"), updateProfilePicture);
-//
 
 /**
  * @swagger

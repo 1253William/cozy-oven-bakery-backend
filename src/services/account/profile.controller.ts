@@ -2,50 +2,50 @@ import {Request, Response} from 'express';
 import User from './user.model';
 import Order from "../orders/order.model";
 import { AuthRequest } from '../../types/authRequest'
-import { cloudinaryHelper } from '../../utils/helpers/cloudinaryHelper';
+// import { cloudinaryHelper } from '../../utils/helpers/cloudinaryHelper';
 import bcrypt from "bcryptjs";
 import redisClient from '../../config/redis';
 require('dotenv').config();
 
-//@route PATCH /api/v1/settings/profile-image
-//@desc Update logged-in user's profile image
-//@access Private
-export const updateProfilePicture = async (req: AuthRequest, res: Response) => {
-  try {
-     const userId = req.user?.userId;
-
-        if (!userId) {
-            res.status(400).json({ success: false, message: "Unauthorized" });
-            return;
-        }
-
-        const user = await User.findById(userId);
-        if (!user) {
-            res.status(404).json({ success: false, message: "User not found" });
-            return;
-        }
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-     if (user.profileImagePublicId) {
-      await cloudinaryHelper.deleteFile(user.profileImagePublicId);
-    }
-
-    const result = await cloudinaryHelper.uploadImage(req.file.path, "vireworkplace/profile_pictures");
-    const updatedUser = await User.findByIdAndUpdate(req.user?.userId, { profileImage: result.url,  profileImagePublicId: result.publicId, }, { new: true });
-
-    res.status(200).json({
-         success: true, 
-         message: "Profile picture updated successfully",
-         data: updatedUser
-     });
-    return;
-
-  } catch (error) {
-    console.error("Error getting settings:", error);
-    res.status(500).json({ success: false, message: "Internal Server error" });
-    return;
-  }
-};
+// //@route PATCH /api/v1/settings/profile-image
+// //@desc Update logged-in user's profile image
+// //@access Private
+// export const updateProfilePicture = async (req: AuthRequest, res: Response) => {
+//   try {
+//      const userId = req.user?.userId;
+//
+//         if (!userId) {
+//             res.status(400).json({ success: false, message: "Unauthorized" });
+//             return;
+//         }
+//
+//         const user = await User.findById(userId);
+//         if (!user) {
+//             res.status(404).json({ success: false, message: "User not found" });
+//             return;
+//         }
+//     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+//
+//      if (user.profileImagePublicId) {
+//       await cloudinaryHelper.deleteFile(user.profileImagePublicId);
+//     }
+//
+//     const result = await cloudinaryHelper.uploadImage(req.file.path, "vireworkplace/profile_pictures");
+//     const updatedUser = await User.findByIdAndUpdate(req.user?.userId, { profileImage: result.url,  profileImagePublicId: result.publicId, }, { new: true });
+//
+//     res.status(200).json({
+//          success: true,
+//          message: "Profile picture updated successfully",
+//          data: updatedUser
+//      });
+//     return;
+//
+//   } catch (error) {
+//     console.error("Error getting settings:", error);
+//     res.status(500).json({ success: false, message: "Internal Server error" });
+//     return;
+//   }
+// };
 
 //******** Account Details **********//
 
