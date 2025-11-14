@@ -7,7 +7,6 @@ import OTPVerification from './OTPVerification.model';
 import {CustomJwtPayload} from '../../types/authRequest';
 import { sendEmail } from '../../utils/email.transporter';
 import { sendSMS } from "../../utils/sendSMS";
-import { sendNotification } from "../notifications/notificationMain.service";
 
 import redisClient from '../../config/redis';
 
