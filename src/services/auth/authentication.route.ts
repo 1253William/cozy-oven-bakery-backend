@@ -38,8 +38,7 @@ const router = express.Router();
  *               role:
  *                 type: string
  *                 enum: ['Customer', 'Admin']
- *                 type: string
- *                 example: "SecurePass123!"
+ *                 example: "Customer"
  *     responses:
  *       201:
  *         description: Your account’s ready!

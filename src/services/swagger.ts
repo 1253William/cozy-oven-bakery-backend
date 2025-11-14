@@ -42,7 +42,7 @@ const options = {
             },
         ],
     },
-    apis: ["src/routes/*.ts"],
+    apis: ["src/services/**/*.route.ts"],
 }
 
 const swaggerSpec = swaggerJSDoc(options);
