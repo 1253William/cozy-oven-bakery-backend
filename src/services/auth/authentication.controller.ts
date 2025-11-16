@@ -38,7 +38,7 @@ export const register = async ( req: Request, res: Response): Promise<void> => {
         if (!fullName || !email || !password ) {
             res.status(400).json({
                 success: false,
-                message: "First Name, Email, Phone Number are required"
+                message: "Full Name, Email, Password are required"
             });
             return
         }

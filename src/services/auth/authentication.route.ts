@@ -35,6 +35,9 @@ const router = express.Router();
  *               phoneNumber:
  *                 type: string
  *                 example: "0205345678"
+ *               password:
+ *                 type: string
+ *                 example: "SecuredPassword1234"
  *               role:
  *                 type: string
  *                 enum: ['Customer', 'Admin']
