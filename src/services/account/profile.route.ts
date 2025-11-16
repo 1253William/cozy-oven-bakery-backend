@@ -1,7 +1,6 @@
 import express from "express";
 import { authMiddleware } from "../../middlewares/authentication.middleware";
 import { authorizedRoles } from "../../middlewares/roles.middleware";
-// import { upload } from "../../middlewares/upload.middleware";
 import { changePassword, deleteAccount, updateProfile } from "./profile.controller";
 
 

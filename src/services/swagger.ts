@@ -23,7 +23,7 @@ const options = {
                 description: "Development server",
             },
             {
-                url: "https://api.cozyoven.store",
+                url: "https://cozy-oven-bakery-backend.onrender.com",
                 description: "Live server"
             }
         ],

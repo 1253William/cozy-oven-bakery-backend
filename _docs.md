@@ -9,10 +9,13 @@ and analytics for both web and event (POS) sales.
 - Payment Integration (Paystack / Hubtel / MoMo)
 - Order Management
 - Offline Sales Sync API
-- Analytics Dashboard API
+- Analytics Dashboard API: Track inventory, Input and track expenses, Product performance
 - Image Storage with Cloudinary
 - Realtime Notifications (via Firebase)
 - Localization for Ghana
+
+
+Products:
 
 
 ##  Folder Structure (sample)
@@ -56,18 +59,10 @@ cd cozy-oven-bakery-backend
 2. Install Dependencies
 npm install
 3. Configure Environment Variables
-Create .env:
-PORT=5000
-MONGO_URI=mongodb+srv://your-connection-string
-JWT_SECRET=supersecretkey
-CLOUDINARY_NAME=your_cloud_name
-CLOUDINARY_KEY=your_key
-CLOUDINARY_SECRET=your_secret
-FRONTEND_URL=https://cozyoven.vercel.app
 
 4. Run Locally
 npm run dev
-API runs on http://localhost:5000
+API runs on http://localhost:6000
 Key Technical Components
 1. JWT Authentication
 import jwt from 'jsonwebtoken';
@@ -175,13 +170,11 @@ Firebase
 Deployment
 Render
 
-//Create email for:
-noreply@cozyoven.store 
-use for email messaging
-
 //Tests for concurrency, idempotency, and security
 
 //Unit Test and E-2-E Test
+
+//Add Prometheus and grafana for observability
 
 //////Temporary
 Folders:

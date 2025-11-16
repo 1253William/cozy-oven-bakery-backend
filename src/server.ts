@@ -11,7 +11,6 @@ import './workers/otpCleaner';
 // import { startStoreCacheJob } from "./workers/storeCacheJob";
 import http from 'http';
 
-
 dotenv.config();
 
 //Database Connection
@@ -21,7 +20,6 @@ const app = express();
 
 //Create an HTTP server for Socket.IO
 const server = http.createServer(app);
-
 
 //Middlewares
 app.use(express.json( { limit: '1mb' } )); 
@@ -85,7 +83,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-//start employee cache cron job
+//start store cache cron job
 // startStoreCacheJob();
 
 const PORT = parseInt(process.env.PORT as string, 10) || 5000;

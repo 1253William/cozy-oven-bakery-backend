@@ -11,7 +11,6 @@ export type User = Document & {
     profileImagePublicId: string;
     role: 'Customer' | 'Admin';
     passwordChangedAt?: Date;
-    isActive?: boolean;
     isAccountVerified?: boolean;
     isAccountDeleted?: boolean;
     createdAt: Date;
@@ -61,10 +60,6 @@ const UserSchema: Schema<User> = new Schema(
         },
         passwordChangedAt: {
             type: Date,
-        },
-        isActive: {
-            type: Boolean,
-            default: false,
         },
         isAccountVerified: {
             type: Boolean,

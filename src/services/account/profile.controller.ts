@@ -97,6 +97,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+
 //******** Account Password **********//
 
 //@route PATCH /api/v1/account/password
