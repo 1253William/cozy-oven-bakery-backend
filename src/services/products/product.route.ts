@@ -18,39 +18,6 @@ const router = express.Router();
 //Admin routes
 /**
  * @swagger
- * /api/v1/dashboard/admin/products/upload:
- *   post:
- *     tags:
- *       - Products (Admin)
- *     summary: Upload product thumbnail
- *     description: Uploads a product image to Cloudinary and returns the hosted URL.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Image uploaded successfully
- *       400:
- *         description: Missing file
- *       500:
- *         description: Cloudinary error
- */
-//@route POST /api/v1/dashboard/admin/products/upload
-//@desc Admin upload product thumbnail or email
-//@access Private (Admin only)
-// router.post("/dashboard/admin/products/upload", authMiddleware, authorizedRoles("Admin") ,uploadProductThumbnail);
-
-/**
- * @swagger
  * /api/v1/dashboard/admin/products:
  *   post:
  *     tags:
