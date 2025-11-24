@@ -12,8 +12,6 @@ export interface ICustomerReview {
 export interface ISelectOption {
     label: string;               // e.g. "Large", "Chocolate", "Vanilla"
     additionalPrice?: number;    // Optional extra cost
-    sku?: string;                // Variant-specific SKU
-    stockQuantity?: number;      // Variant stock
 }
 
 //Product Interface
@@ -23,7 +21,7 @@ export interface IProduct extends Document {
     productPublicId: string;
     productDetails: string;
 
-    price: number;                     // Base price
+    price?: number;                     // Base price
     sku: string;                       // Main SKU
     stockQuantity: number;
 
@@ -32,10 +30,10 @@ export interface IProduct extends Document {
     productStatus: "in stock" | "low stock" | "out of stock";
     isAvailable: boolean;
 
-    rating: number;
-    customerReviews: ICustomerReview[];
+    rating?: number;
+    customerReviews?: ICustomerReview[];
 
-    selectOptions: ISelectOption[];
+    selectOptions?: ISelectOption[];
 
     dateAdded: Date;
 }
@@ -56,9 +54,7 @@ const CustomerReviewSchema = new Schema<ICustomerReview>(
 const SelectOptionSchema = new Schema<ISelectOption>(
     {
         label: { type: String, required: true },
-        additionalPrice: { type: Number, default: 0 },
-        sku: { type: String, trim: true },
-        stockQuantity: { type: Number, default: 0 }
+        additionalPrice: { type: Number, default: 0 }
     },
     { _id: false }
 );
@@ -67,13 +63,17 @@ const ProductSchema: Schema<IProduct> = new Schema(
     {
         productName: {
             type: String,
-            required: [true, "Product name is required"],
+            required: function(): boolean {
+                return this.isNew;
+            },
             trim: true,
             maxlength: 150
         },
         productThumbnail: {
             type: String,
-            required: [true, "Product thumbnail is required"]
+            required: function(): boolean {
+                return this.isNew;
+            }
         },
         productPublicId: {
             type: String
@@ -85,7 +85,7 @@ const ProductSchema: Schema<IProduct> = new Schema(
         },
         price: {
             type: Number,
-            required: true,
+            required: false,
             min: 0
         },
         sku: {
@@ -100,7 +100,9 @@ const ProductSchema: Schema<IProduct> = new Schema(
         },
         productCategory: {
             type: String,
-            required: true,
+            required: function(): boolean {
+                return this.isNew;
+            },
         },
         productStatus: {
             type: String,
@@ -142,6 +144,7 @@ ProductSchema.index({ productName: "text", productDetails: "text" });
 ProductSchema.index({ price: 1 });
 ProductSchema.index({ stockQuantity: 1 });
 ProductSchema.index({ rating: -1 });
+ProductSchema.index({ createdAt: -1 });
 
 const ProductModel: Model<IProduct> = mongoose.model<IProduct>("Product", ProductSchema);
 export default ProductModel;

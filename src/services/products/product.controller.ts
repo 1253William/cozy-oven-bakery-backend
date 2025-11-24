@@ -72,20 +72,36 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
                 res.status(403).json({success: false, message: "Forbidden: Admin only"});
                 return;
             }
-            const {
+            let {
                 productName,
                 price,
                 productCategory,
-                productDetails
+                productDetails,
             } = req.body;
 
             //Validate fields
-            if (!productName || !price || !productCategory) {
+            if (!productName || !productCategory || !productDetails) {
                 res.status(400).json({
                     success: false,
-                    message: "productName, price, and productCategory are required"
+                    message: "Product Name, Product Category and Product Details are required"
                 });
                 return;
+            }
+
+            let selectOptions = [];
+            if (req.body.selectOptions) {
+                selectOptions = JSON.parse(req.body.selectOptions);
+            }
+
+            //If selectOptions was added, use its additionalPrice the least price as the price of the base product (price)
+            if (selectOptions.length > 0) {
+                let leastPrice = selectOptions[0].additionalPrice;
+                for (let i = 1; i < selectOptions.length; i++) {
+                    if (selectOptions[i].additionalPrice < leastPrice) {
+                        leastPrice = selectOptions[i].additionalPrice;
+                    }
+                }
+                price = leastPrice;
             }
 
             if (!req.file) {
@@ -120,7 +136,8 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
                 productPublicId: publicId,
                 productDetails,
                 price,
-                sku
+                sku,
+                selectOptions: selectOptions
             });
 
             //Invalidate cache
@@ -152,32 +169,71 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
 export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-
-        if (!userId) {
-            res.status(400).json({ success: false, message: "Unauthorized" });
-            return;
-        }
         const user = await User.findById(userId);
-        if (!user || user.role !== "Admin") {
-            res.status(403).json({ success: false, message: "Forbidden: Admin only" });
+        if (!user) {
+            res.status(400).json({ success: false, message: "Unauthorized: Admin only" });
             return;
         }
 
-        const cached = await redisClient.get("products:all");
+        //Pagination, Sorting and Filtering
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 20;
+        const skip = (page-1) * limit;
 
-        if (cached) {
-            res.status(200).json({ success: true, cached: true, data: JSON.parse(cached) });
+        const category = req.query.category as string;
+        const sortBy = (req.query.sortBy as string) || "createdAt";
+        const order = (req.query.order as string ) === "asc" ? 1 : -1
+
+        const query: Record<string, unknown> = { };
+        if(category) query.productCategory = category;
+
+        //Redis cache
+        const redisKey = `products:admin:page:${page}:limit:${limit}:cat:${category || "all"}:sort:${sortBy}:${order}`;
+
+        const cachedData = await redisClient.get(redisKey);
+        if (cachedData) {
+            res.status(200).json({ success: true, cached: true, data: JSON.parse(cachedData) });
             return;
         }
 
-        const products = await ProductModel.find().lean();
+        //DB Query (O(N))
+        const products = await ProductModel.find(query)
+            .sort({ [sortBy]: order })
+            .skip(skip)
+            .limit(limit)
+            .select("-__v")
+            .lean();
+        if(!products || products.length === 0) {
+            res.status(404).json({ success: false, message: "No products found" });
+            return;
+        }
 
-        await redisClient.setex("products:all", 60, JSON.stringify(products));
+        //Fast count for pagination metadata
+        const totalDocuments = await ProductModel.countDocuments(query);
+        const totalPages = Math.ceil(totalDocuments / limit);
+
+        const responsePayload = {
+            success: true,
+            cached: false,
+            pagination: {
+                page,
+                limit,
+                totalDocuments,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            },
+            data: products
+        };
+        //Cache result (short expiry)
+        await redisClient.setex(redisKey, 60, JSON.stringify(responsePayload));
 
         res.status(200).json({
             success: true,
-            data: products,
+            message: "Products fetched successfully",
+            data: responsePayload,
         });
+        return;
 
     } catch (error) {
         console.error("Error getting products", error);
@@ -186,42 +242,57 @@ export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Prom
     }
 };
 
+
 //@route GET /api/v1/dashboard/admin/products/:id
 //@desc Fetch a product item
 //@access Private (Admin only)
 export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-
-        if (!userId) {
-            res.status(400).json({ success: false, message: "Unauthorized" });
-            return;
-        }
         const user = await User.findById(userId);
-        if (!user || user.role !== "Admin") {
-            res.status(403).json({ success: false, message: "Forbidden: Admin only" });
+        if (!user) {
+            res.status(400).json({ success: false, message: "Unauthorized: Admin only" });
             return;
         }
+
         const { productId } = req.params;
-
         const cacheKey = `product:${productId}`;
-        const cached = await redisClient.get(cacheKey);
 
-        if (cached) {
-            res.status(200).json({ success: true, cached: true, data: JSON.parse(cached) });
+        const start = performance.now();
+        const cachedBuffer = await redisClient.getBuffer(cacheKey);
+
+        if (cachedBuffer) {
+            const product = JSON.parse(cachedBuffer.toString());
+            const end = performance.now();
+            res.status(200).json({
+                success: true,
+                message: "Product fetched (cache)",
+                cached: true,
+                cacheResponseTimeMs: Math.round(end - start),
+                data: product
+            });
             return;
         }
 
-        const product = await ProductModel.findById(productId);
-
+        const product = await ProductModel.findById(productId).lean()
+            .select("-__v");
         if (!product) {
             res.status(404).json({ success: false, message: "Product not found" });
             return;
         }
 
         await redisClient.setex(cacheKey, 120, JSON.stringify(product));
+        const end = performance.now();
 
-        res.status(200).json({ success: true, data: product });
+        res.status(200).json({
+            success: true,
+            message: "Product fetched successfully (DB)",
+            cached: false,
+            responseTimeMs: Math.round(end - start),
+            data: product
+        });
+        return;
+
     } catch (error) {
         console.error("Error fetching product", error);
         res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -229,52 +300,122 @@ export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Prom
     }
 };
 
+
 //@route PATCH /api/v1/dashboard/admin/products/:id
-//@desc Admin edit product item
+//@desc Admin edit product item (with safe thumbnail replacement)
 //@access Private (Admin only)
 export const updateProduct = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-
-        if (!userId) {
-            res.status(400).json({ success: false, message: "Unauthorized" });
-            return;
-        }
-        const user = await User.findById(userId);
+        const user = await User.findById(userId).select("role");
         if (!user || user.role !== "Admin") {
-            res.status(403).json({ success: false, message: "Forbidden: Admin only" });
+            res.status(403).json({ success: false, message: "Unauthorized: Admin only" });
             return;
         }
-        const { productId } = req.params;
 
+        const { productId } = req.params;
+        console.log("updating product: ", productId)
         const product = await ProductModel.findById(productId);
         if (!product) {
             res.status(404).json({ success: false, message: "Product not found" });
             return;
         }
-        // Switch updateProduct to the safe two-step approach (upload new image first, then delete old), and provide that version
-        // If a file is uploaded, replace existing image
-        if ((req as any).file) {
-            // delete old image if present
-            if (product.productPublicId) {
-                try {
-                    await cloudinaryHelper.deleteFile(product.productPublicId);
-                } catch (err) {
-                    // log but don't block update (you may choose to surface error)
-                    console.warn("Failed to delete old Cloudinary file:", err);
+
+        const {
+            productName,
+            productCategory,
+            productDetails,
+            price
+        } = req.body;
+
+        let selectOptions = product.selectOptions;
+
+        if (req.body.selectOptions) {
+            try {
+                selectOptions = JSON.parse(req.body.selectOptions);
+
+                // Recalculate price based on least additionalPrice
+                // @ts-ignore
+                if (selectOptions.length > 0) {
+                    // @ts-ignore
+                    let leastPrice = selectOptions[0].additionalPrice;
+                    // @ts-ignore
+                    for (let i = 1; i < selectOptions.length; i++) {
+                        // @ts-ignore
+                        if (selectOptions[i].additionalPrice < leastPrice) {
+                            // @ts-ignore
+                            leastPrice = selectOptions[i].additionalPrice;
+                        }
+                    }
+
+                    product.price = leastPrice;
                 }
+
+            } catch (err) {
+                res.status(400).json({
+                    success: false,
+                    message: "Invalid selectOptions format (must be JSON array)"
+                });
+                return;
             }
-            const upload = await cloudinaryHelper.uploadImage((req as any).file.path, "cozyoven/products_thumbnails");
-            req.body.productThumbnail = upload.url;
-            req.body.productPublicId = upload.publicId;
         }
 
-        // If productThumbnail provided as URL (no file) and different publicId is provided, update fields too.
-        // Merge req.body into product and save
-        Object.assign(product, req.body);
+        if (req.file) {
+            try {
+                //upload new image first
+                const upload = await cloudinaryHelper.uploadImage(
+                    req.file.path,
+                    "cozyoven/products_thumbnails"
+                );
+                if (!upload.url) {
+                    res.status(500).json({ success: false, message: "Thumbnail upload failed" });
+                    return;
+                }
+                const oldPublicId = product.productPublicId;
+                //apply the new image values
+                product.productThumbnail = upload.url;
+                product.productPublicId = upload.publicId;
+
+                //safe delete of old image AFTER successful upload
+                if (oldPublicId) {
+                    try {
+                        await cloudinaryHelper.deleteFile(oldPublicId);
+                    } catch (err) {
+                        console.warn("Cloudinary delete error:", err);
+                    }
+                }
+
+            } catch (err) {
+                console.error("Thumbnail update error:", err);
+                res.status(500).json({ success: false, message: "Failed to update thumbnail" });
+                return;
+            }
+        }
+
+        if (productName) {
+            product.productName = productName;
+            product.sku = generateSKU(productName);
+        }
+
+        if (productCategory) product.productCategory = productCategory;
+        if (productDetails) product.productDetails = productDetails;
+
+        //If selectOptions was NOT provided, only then update price manually
+        if (!req.body.selectOptions && price !== undefined) {
+            product.price = price;
+        }
+
+        //If selectOptions was provided, apply it
+        if (req.body.selectOptions) {
+            product.selectOptions = selectOptions;
+        }
+
         await product.save();
 
-        // invalidate caches
+        const keys = await redisClient.keys("products:*");
+        for (const key of keys) {
+            await redisClient.del(key);
+        }
         await redisClient.del("products:all");
         await redisClient.del(`product:${productId}`);
 
@@ -283,6 +424,7 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
             message: "Product updated successfully",
             data: product
         });
+        return;
 
     } catch (error) {
         console.error("Error updating product", error);

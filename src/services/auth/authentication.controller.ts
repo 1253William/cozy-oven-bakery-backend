@@ -220,7 +220,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         role: matchedUser.role
       },
       process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: "30m", algorithm: "HS256" }
+      { expiresIn: "1h", algorithm: "HS256" }
     );
 
     //Prepare safe user object

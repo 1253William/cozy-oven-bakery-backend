@@ -3,11 +3,11 @@
 // import OrderModel from "../models/order.model";
 // import redisClient from "../config/redis";
 //
-// // 🕒 Refresh store cache every 2 minutes
+// // Refresh store cache every 2 minutes
 // export const startStoreCacheJob = () => {
 //   cron.schedule("*/2 * * * *", async () => {
 //     try {
-//       console.log("🔄 Running Cozy Oven store cache refresh...");
+//       console.log("Running Cozy Oven store cache refresh...");
 //
 //       const todayKey = new Date().toISOString().split("T")[0];
 //       const cacheKey = `store-cache:${todayKey}`;
@@ -19,7 +19,7 @@
 //       ).lean();
 //
 //       if (!products.length) {
-//         console.warn("⚠️ No active products found in inventory.");
+//         console.warn("No active products found in inventory.");
 //         return;
 //       }
 //
@@ -66,9 +66,9 @@
 //       // Store in Redis cache (expires in 3 minutes)
 //       await redisClient.setex(cacheKey, 180, JSON.stringify(storeData));
 //
-//       console.log(`✅ Cozy Oven store cache updated: ${new Date().toISOString()}`);
+//       console.log(`Cozy Oven store cache updated: ${new Date().toISOString()}`);
 //     } catch (err) {
-//       console.error("🔥 Store cache job error:", err);
+//       console.error("Store cache job error:", err);
 //     }
 //   });
 // };
