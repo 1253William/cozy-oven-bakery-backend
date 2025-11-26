@@ -3,6 +3,7 @@ import authRouter from "../services/auth/authentication.route";
 import userRouter from "../services/account/user.route";
 import productRouter from "../services/products/product.route"
 import settingsRouter from "../services/account/profile.route";
+import { authMiddleware } from "../middlewares/authentication.middleware";
 // import searchRouter from "../services/globals/search.routes";
 // import inventoryRouter from "../services/inventory/inventory.route";
 // import notificationRouter from "./notification.route";
@@ -30,6 +31,17 @@ rootRouter.use('/', productRouter);
 
 //Notification routes
 // rootRouter.use('/notifications', notificationRouter);
+
+rootRouter.get("/auth-test", authMiddleware, (req, res) => {
+    res.json({ ok: true, user: (req as any).user });
+});
+
+rootRouter.get("/products-test", authMiddleware, (req, res) => {
+    console.log("[product-test] hit");
+    res.json({ ok: true });
+});
+
+
 
 
 export default rootRouter;

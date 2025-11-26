@@ -369,18 +369,203 @@ router.get("/dashboard/admin/products/:productId", authMiddleware,  authorizedRo
 //@access Private (Admin only)
 router.patch("/dashboard/admin/products/:productId", authMiddleware,  authorizedRoles("Admin"), upload.single("thumbnail"),updateProduct);
 
+/**
+ * @swagger
+ * /api/v1/dashboard/admin/products/{productId}:
+ *   delete:
+ *     summary: Delete product item
+ *     description: Permanently deletes a product and its Cloudinary image. Admin access only.
+ *     tags:
+ *       - Products (Admin)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the product to delete
+ *     responses:
+ *       200:
+ *         description: Product deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Product deleted successfully
+ *       400:
+ *         description: Unauthorized (No user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
+ *       403:
+ *         description: Forbidden (Not Admin)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Forbidden (Admin only)
+ *       404:
+ *         description: Product not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Product not found
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Internal server error
+ */
 //@route DELETE /api/v1/dashboard/admin/products/:id
 //@desc Delete product item
 //@access Private (Admin only)
 router.delete("/dashboard/admin/products/:productId", authMiddleware, authorizedRoles("Admin"), deleteProduct);
 
+
+
 //Customer routes
 
+/**
+ * @swagger
+ * /api/v1/store/customer/products:
+ *   get:
+ *     summary: Fetch all products for customers
+ *     description: Fetches all available products for customers.
+ *     tags: Products (Customer)
+ *     responses:
+ *       200:
+ *         description: Products fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: All products fetched successfully for customer
+ *                 cached:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: "#/components/schemas/Product"
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal Server Error
+ */
 //@route GET /api/v1/store/customer/products
 //@desc Fetch all products by pagination, optionally sort and filter by category
 //@access Public (Customer)
 router.get("/store/customer/products", getAllProductsCustomer);
 
+/**
+ * @swagger
+ * /api/v1/store/customer/products/{productId}:
+ *   get:
+ *     summary: Fetch a single product for customer
+ *     description: Fetch a single product item by ID for customers.
+ *     tags: Products (Customer)
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: 64fcb824a9de2c001f9b1234
+ *     responses:
+ *       200:
+ *         description: Product fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Product fetched successfully for customer
+ *                 data:
+ *                   $ref: "#/components/schemas/Product"
+ *       404:
+ *         description: Product not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Product not found
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: Internal Server Error
+ */
 //@route GET /api/v1/store/customer/products/:id
 //@desc Fetch a product item
 //@access Public (Customer)

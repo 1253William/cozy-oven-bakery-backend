@@ -24,7 +24,6 @@ const server = http.createServer(app);
 //Middlewares
 app.use(express.json( { limit: '1mb' } )); 
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use(cors());
 app.use(helmet(
     {
   contentSecurityPolicy: {
@@ -45,12 +44,7 @@ app.use('/api-docs', SwaggerUi.serve, SwaggerUi.setup(SwaggerSpec));
 app.set("trust proxy", 1);
 
 //CORS
-app.use(
-    cors({
-        origin: (_origin, callback) => callback(null, true),
-        credentials: true,
-    })
-);
+app.use(cors({ origin: "*", credentials: true }));
 
 const blockedPaths = [
   "/xmlrpc.php",
@@ -59,13 +53,6 @@ const blockedPaths = [
   "/wlwmanifest.xml",
   "/wp-includes",
 ];
-
-app.use((req, res, next) => {
-  if (blockedPaths.some(path => req.originalUrl.includes(path))) {
-    return res.status(403).json({ message: "Forbidden" });
-  }
-  next();
-});
 
 //routes
 app.use("/api/v1", rootRouter);
@@ -76,6 +63,13 @@ app.get('/', (_req, res) => {
         version: '1.0.0',
         year: new Date().getFullYear()
     });
+});
+
+app.use((req, res, next) => {
+    if (blockedPaths.some(path => req.originalUrl.includes(path))) {
+        return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
 });
 
 // 404 handler

@@ -4,61 +4,10 @@ import User from '../account/user.model';
 import { generateSKU } from "../../utils/helpers/generateSKU";
 import redisClient from '../../config/redis';
 import { cloudinaryHelper } from '../../utils/helpers/cloudinaryHelper';
+import {withTimeout} from "../../utils/helpers/timeOut";
 import { AuthRequest } from '../../types/authRequest'
 
 /**************ADMIN PRODUCT CONTROLLERS**********************/
-//@route POST /api/v1/dashboard/admin/products/upload
-//@desc Admin upload product thumbnail or email
-//@access Private (Admin only)
-// export const uploadProductThumbnail = async (req: AuthRequest, res: Response): Promise<void> => {
-//     try {
-//         const userId = req.user?.userId;
-//
-//         if (!userId) {
-//             res.status(400).json({ success: false, message: "Unauthorized" });
-//             return;
-//         }
-//         const user = await User.findById(userId);
-//         if (!user || user.role !== "Admin") {
-//             res.status(403).json({ success: false, message: "Forbidden: Admin only" });
-//             return;
-//         }
-//
-//         if (!req.file) {
-//             res.status(400).json({
-//                 success: false,
-//                 message: "No file uploaded"
-//             });
-//             return;
-//         }
-//
-//         const result = await cloudinaryHelper.uploadImage(req.file.path, "cozyoven/products_thumbnails");
-//         const productThumbnail = await ProductModel.findByIdAndUpdate( { productThumbnail: result.url,  productPublicId: result.publicId, }, { new: true });
-//
-//
-//         // const result = await cloudinary.uploader.upload(req.file.path, {
-//         //     folder: "seltra/products",
-//         //     resource_type: "image"
-//         // });
-//
-//         res.status(200).json({
-//             success: true,
-//             message: "Image uploaded successfully",
-//             url: result.secure_url,
-//             publicId: result.public_id
-//         });
-//         return;
-//
-//     } catch (err) {
-//         res.status(500).json({
-//             success: false,
-//             message: "Cloudinary upload failed",
-//             error: err
-//         });
-//         return;
-//     }
-// };
-
 //@route POST /api/v1/dashboard/admin/products
 //@desc  Admin creates a new product (with thumbnail upload)
 //@access Private (Admin only)
@@ -141,7 +90,11 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
             });
 
             //Invalidate cache
-            await redisClient.del("products:all");
+            try {
+                await redisClient.del("products:all");
+            } catch (err) {
+                console.warn("Redis delete failed:", err);
+            }
 
             res.status(201).json({
                 success: true,
@@ -190,11 +143,18 @@ export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Prom
         //Redis cache
         const redisKey = `products:admin:page:${page}:limit:${limit}:cat:${category || "all"}:sort:${sortBy}:${order}`;
 
-        const cachedData = await redisClient.get(redisKey);
-        if (cachedData) {
-            res.status(200).json({ success: true, cached: true, data: JSON.parse(cachedData) });
-            return;
-        }
+        // const cachedData = await redisClient.get(redisKey);
+        // let cachedData: string | null = null;
+        // try {
+        //     cachedData = await redisClient.get(redisKey);
+        // } catch (err) {
+        //     console.warn("Redis get failed, bypassing cache:", err);
+        // }
+        //
+        // if (cachedData) {
+        //     res.status(200).json({ success: true, cached: true, data: JSON.parse(cachedData) });
+        //     return;
+        // }
 
         //DB Query (O(N))
         const products = await ProductModel.find(query)
@@ -215,6 +175,7 @@ export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Prom
         const responsePayload = {
             success: true,
             cached: false,
+            message: "Products fetched successfully",
             pagination: {
                 page,
                 limit,
@@ -226,13 +187,14 @@ export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Prom
             data: products
         };
         //Cache result (short expiry)
-        await redisClient.setex(redisKey, 60, JSON.stringify(responsePayload));
+        // await redisClient.setex(redisKey, 60, JSON.stringify(responsePayload));
+        // try {
+        //     await redisClient.setex(redisKey, 60, JSON.stringify(responsePayload));
+        // } catch (err) {
+        //     console.warn("Redis set failed:", err);
+        // }
 
-        res.status(200).json({
-            success: true,
-            message: "Products fetched successfully",
-            data: responsePayload,
-        });
+        res.status(200).json(responsePayload);
         return;
 
     } catch (error) {
@@ -257,22 +219,29 @@ export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Prom
 
         const { productId } = req.params;
         const cacheKey = `product:${productId}`;
+        //
+        // const start = performance.now();
+        //
+        // let cachedBuffer: Buffer | null = null;
+        // try {
+        //     cachedBuffer = await redisClient.getBuffer(cacheKey);
+        // } catch (err) {
+        //     console.warn("Redis getBuffer failed, bypassing cache:", err);
+        // }
 
-        const start = performance.now();
-        const cachedBuffer = await redisClient.getBuffer(cacheKey);
 
-        if (cachedBuffer) {
-            const product = JSON.parse(cachedBuffer.toString());
-            const end = performance.now();
-            res.status(200).json({
-                success: true,
-                message: "Product fetched (cache)",
-                cached: true,
-                cacheResponseTimeMs: Math.round(end - start),
-                data: product
-            });
-            return;
-        }
+        // if (cachedBuffer) {
+        //     const product = JSON.parse(cachedBuffer.toString());
+        //     const end = performance.now();
+        //     res.status(200).json({
+        //         success: true,
+        //         message: "Product fetched (cache)",
+        //         cached: true,
+        //         cacheResponseTimeMs: Math.round(end - start),
+        //         data: product
+        //     });
+        //     return;
+        // }
 
         const product = await ProductModel.findById(productId).lean()
             .select("-__v");
@@ -280,15 +249,18 @@ export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Prom
             res.status(404).json({ success: false, message: "Product not found" });
             return;
         }
-
-        await redisClient.setex(cacheKey, 120, JSON.stringify(product));
-        const end = performance.now();
+        //
+        // try {
+        //     await redisClient.setex(cacheKey, 120, JSON.stringify(product));
+        // } catch (err) {
+        //     console.warn("Redis set failed:", err);
+        // }
+        // const end = performance.now();
 
         res.status(200).json({
             success: true,
             message: "Product fetched successfully (DB)",
             cached: false,
-            responseTimeMs: Math.round(end - start),
             data: product
         });
         return;
@@ -307,15 +279,24 @@ export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Prom
 export const updateProduct = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const user = await User.findById(userId).select("role");
+        const user = await withTimeout(
+            User.findById(userId).select("role"),
+            5000
+        );
+
         if (!user || user.role !== "Admin") {
             res.status(403).json({ success: false, message: "Unauthorized: Admin only" });
             return;
         }
 
         const { productId } = req.params;
-        console.log("updating product: ", productId)
-        const product = await ProductModel.findById(productId);
+        console.log("updating product: ", productId);
+
+        const product = await withTimeout(
+            ProductModel.findById(productId),
+            5000
+        );
+
         if (!product) {
             res.status(404).json({ success: false, message: "Product not found" });
             return;
@@ -334,20 +315,14 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
             try {
                 selectOptions = JSON.parse(req.body.selectOptions);
 
-                // Recalculate price based on least additionalPrice
-                // @ts-ignore
-                if (selectOptions.length > 0) {
-                    // @ts-ignore
+                if (Array.isArray(selectOptions) && selectOptions.length > 0 && selectOptions[0]?.additionalPrice !== undefined) {
                     let leastPrice = selectOptions[0].additionalPrice;
-                    // @ts-ignore
                     for (let i = 1; i < selectOptions.length; i++) {
-                        // @ts-ignore
-                        if (selectOptions[i].additionalPrice < leastPrice) {
-                            // @ts-ignore
-                            leastPrice = selectOptions[i].additionalPrice;
+                        const option = selectOptions[i];
+                        if (option?.additionalPrice !== undefined && option.additionalPrice < leastPrice) {
+                            leastPrice = option.additionalPrice;
                         }
                     }
-
                     product.price = leastPrice;
                 }
 
@@ -362,24 +337,30 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
 
         if (req.file) {
             try {
-                //upload new image first
-                const upload = await cloudinaryHelper.uploadImage(
-                    req.file.path,
-                    "cozyoven/products_thumbnails"
+                const upload = await withTimeout(
+                    cloudinaryHelper.uploadImage(
+                        req.file.path,
+                        "cozyoven/products_thumbnails"
+                    ),
+                    10000
                 );
-                if (!upload.url) {
+
+                if (!upload?.url) {
                     res.status(500).json({ success: false, message: "Thumbnail upload failed" });
                     return;
                 }
+
                 const oldPublicId = product.productPublicId;
-                //apply the new image values
+
                 product.productThumbnail = upload.url;
                 product.productPublicId = upload.publicId;
 
-                //safe delete of old image AFTER successful upload
                 if (oldPublicId) {
                     try {
-                        await cloudinaryHelper.deleteFile(oldPublicId);
+                        await withTimeout(
+                            cloudinaryHelper.deleteFile(oldPublicId),
+                            5000
+                        );
                     } catch (err) {
                         console.warn("Cloudinary delete error:", err);
                     }
@@ -400,24 +381,22 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
         if (productCategory) product.productCategory = productCategory;
         if (productDetails) product.productDetails = productDetails;
 
-        //If selectOptions was NOT provided, only then update price manually
         if (!req.body.selectOptions && price !== undefined) {
             product.price = price;
         }
 
-        //If selectOptions was provided, apply it
         if (req.body.selectOptions) {
             product.selectOptions = selectOptions;
         }
 
-        await product.save();
+        await withTimeout(product.save(), 8000);
 
-        const keys = await redisClient.keys("products:*");
-        for (const key of keys) {
-            await redisClient.del(key);
+        try {
+            await withTimeout(redisClient.del("products:all"), 3000);
+            await withTimeout(redisClient.del(`product:${productId}`), 3000);
+        } catch (err) {
+            console.warn("Redis delete failed:", err);
         }
-        await redisClient.del("products:all");
-        await redisClient.del(`product:${productId}`);
 
         res.status(200).json({
             success: true,
@@ -426,9 +405,16 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
         });
         return;
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating product", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: "Internal server error",
+                error: error.message
+            });
+        }
         return;
     }
 };
@@ -440,49 +426,69 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
 export const deleteProduct = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-
         if (!userId) {
             res.status(400).json({ success: false, message: "Unauthorized" });
             return;
         }
-        const user = await User.findById(userId);
+
+        const user = await withTimeout(
+            User.findById(userId),
+            5000
+        );
+
         if (!user || user.role !== "Admin") {
             res.status(403).json({ success: false, message: "Forbidden: Admin only" });
             return;
         }
+
         const { productId } = req.params;
 
-        const product = await ProductModel.findById(productId);
+        const product = await withTimeout(
+            ProductModel.findById(productId),
+            5000
+        );
+
         if (!product) {
             res.status(404).json({ success: false, message: "Product not found" });
             return;
         }
 
-        // delete image from Cloudinary if exists
         if (product.productPublicId) {
             try {
-                await cloudinaryHelper.deleteFile(product.productPublicId);
+                await withTimeout(
+                    cloudinaryHelper.deleteFile(product.productPublicId),
+                    5000
+                );
             } catch (err) {
                 console.warn("Cloudinary delete failed:", err);
-                // proceed with deletion of db record to avoid orphaned app state
             }
         }
 
-        await product.deleteOne();
+        await withTimeout(product.deleteOne(), 8000);
 
-        // invalidate caches
-        await redisClient.del("products:all");
-        await redisClient.del(`product:${productId}`);
+        // try {
+        //     await withTimeout(redisClient.del("products:all"), 3000);
+        //     await withTimeout(redisClient.del(`product:${productId}`), 3000);
+        // } catch (err) {
+        //     console.warn("Redis delete failed:", err);
+        // }
 
         res.status(200).json({
             success: true,
-            message: "Product deleted successfully",
+            message: "Product deleted successfully"
         });
         return;
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error deleting product", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: "Internal server error",
+                error: error.message
+            });
+        }
         return;
     }
 };
@@ -494,25 +500,69 @@ export const deleteProduct = async (req: AuthRequest, res: Response): Promise<vo
 //@access Public (Customer)
 export const getAllProductsCustomer = async (req: Request, res: Response): Promise<void> => {
     try {
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 20;
+        const skip = (page-1) * limit;
 
-        let cached = await redisClient.get("products:all");
+        const category = req.query.category as string;
+        const sortBy = (req.query.sortBy as string) || "createdAt";
+        const order = (req.query.order as string ) === "asc" ? 1 : -1
 
-        if (!cached) {
-            const products = await ProductModel.find().lean();
-            await redisClient.setex("products:all", 60, JSON.stringify(products));
-            res.status(200).json({
-                success: true,
-                message: "All products fetched successfully for customer",
-                data: products,
-            });
-        } else {
-            res.status(200).json(
-                {
-                 success: true,
-                 cached: true,
-                 data: JSON.parse(cached)});
+        const query: Record<string, unknown> = { };
+        if(category) query.productCategory = category;
+
+        //DB Query (O(N))
+        const getProducts = await ProductModel.find(query)
+            .sort({ [sortBy]: order })
+            .skip(skip)
+            .limit(limit)
+            .select("-__v")
+            .lean();
+        if(!getProducts || getProducts.length === 0) {
+            res.status(404).json({ success: false, message: "No products found" });
             return;
         }
+
+        //Fast count for pagination metadata
+        const totalDocuments = await ProductModel.countDocuments(query);
+        const totalPages = Math.ceil(totalDocuments / limit);
+
+        const responsePayload = {
+            success: true,
+            cached: false,
+            message: "Products fetched successfully",
+            pagination: {
+                page,
+                limit,
+                totalDocuments,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            },
+            data: getProducts
+        };
+
+        res.status(200).json(responsePayload);
+        return;
+
+        // let cached = await redisClient.get("products:all");
+        //
+        // if (!cached) {
+        //     const products = await ProductModel.find().lean();
+        //     await redisClient.setex("products:all", 60, JSON.stringify(products));
+        //     res.status(200).json({
+        //         success: true,
+        //         message: "All products fetched successfully for customer",
+        //         data: products,
+        //     });
+        // } else {
+        //     res.status(200).json(
+        //         {
+        //          success: true,
+        //          cached: true,
+        //          data: JSON.parse(cached)});
+        //     return;
+        // }
     } catch (error) {
         console.error("Error getting products:", error);
         res.status(500).json({ success: false, error: "Internal Server Error" });
@@ -528,37 +578,22 @@ export const getProductByIdCustomer = async (req: Request, res: Response): Promi
     try {
         let productId: string;
         ({productId} = req.params);
+        const product = await ProductModel.findById(productId);
+        if (!product) {
+          res.status(404).json(
+          {
+         success: false,
+           message: "Product not found"});
+        return;
+           }
 
-        let cacheKey: string;
-        cacheKey = `product:${productId}`;
-        const [cached] = await Promise.all([redisClient.get(cacheKey)]);
-
-        if (!cached) {
-            const [product] = await Promise.all([ProductModel.findById(productId)]);
-            if (!product) {
-                res.status(404).json(
-                    {
-                        success: false,
-                        message: "Product not found"});
-                return;
+        res.status(200).json({
+                success: true,
+                message: "Product fetched successfully for customer",
+                data: product
             }
-            await redisClient.setex(cacheKey, 120, JSON.stringify(product));
-
-            res.status(200).json(
-                {
-                    success: true,
-                    message: "Product fetched successfully for customer",
-                    data: product
-                });
-        } else {
-            res.status(200).json(
-                {
-                    success: true,
-                    cached: true,
-                    data: JSON.parse(cached)
-                });
-            return;
-        }
+        )
+        return
 
     } catch (error) {
         console.error("Error getting product:", error);
