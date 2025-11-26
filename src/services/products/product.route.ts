@@ -468,7 +468,8 @@ router.delete("/dashboard/admin/products/:productId", authMiddleware, authorized
  *   get:
  *     summary: Fetch all products for customers
  *     description: Fetches all available products for customers.
- *     tags: Products (Customer)
+ *     tags:
+ *       - Products (Customer)
  *     responses:
  *       200:
  *         description: Products fetched successfully
@@ -515,7 +516,8 @@ router.get("/store/customer/products", getAllProductsCustomer);
  *   get:
  *     summary: Fetch a single product for customer
  *     description: Fetch a single product item by ID for customers.
- *     tags: Products (Customer)
+ *     tags:
+ *       - Products (Customer)
  *     parameters:
  *       - in: path
  *         name: productId
