@@ -2,6 +2,7 @@ import express from "express";
 import authRouter from "../services/auth/authentication.route";
 import userRouter from "../services/account/user.route";
 import productRouter from "../services/products/product.route"
+import orderRouter from "../services/orders/order.route";
 import settingsRouter from "../services/account/profile.route";
 import { authMiddleware } from "../middlewares/authentication.middleware";
 // import searchRouter from "../services/globals/search.routes";
@@ -25,6 +26,9 @@ rootRouter.use('/account', settingsRouter);
 
 //Product routes
 rootRouter.use('/', productRouter);
+
+//Order & Payment routes
+rootRouter.use('/', orderRouter);
 
 //Search routes
 // rootRouter.use('/search', searchRouter);

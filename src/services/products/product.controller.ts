@@ -89,12 +89,12 @@ export const createProduct = async (req: AuthRequest, res: Response): Promise<vo
                 selectOptions: selectOptions
             });
 
-            //Invalidate cache
-            try {
-                await redisClient.del("products:all");
-            } catch (err) {
-                console.warn("Redis delete failed:", err);
-            }
+            // //Invalidate cache
+            // try {
+            //     await redisClient.del("products:all");
+            // } catch (err) {
+            //     console.warn("Redis delete failed:", err);
+            // }
 
             res.status(201).json({
                 success: true,

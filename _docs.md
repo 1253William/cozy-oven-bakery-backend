@@ -186,3 +186,9 @@ Folders:
 05_Analytics
 06_Webhooks
 99_Utilities (seed DB, clear DB, generate JWT)
+
+
+
+//Webhook listener for Paystack
+//Order analytics pipeline
+//Add Auto-invoice & receipt generator

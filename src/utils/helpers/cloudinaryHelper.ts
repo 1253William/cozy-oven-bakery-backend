@@ -16,7 +16,7 @@ export const cloudinaryHelper = {
         }
     },
 
-    uploadFile: async (filePath: string, folder = "cozyoven") => {
+    uploadFile: async (filePath: string, folder = "cozyoven/files") => {
         try {
             const result = await cloudinary.uploader.upload(filePath, {
                 folder,

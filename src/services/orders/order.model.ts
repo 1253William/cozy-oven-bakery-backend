@@ -25,8 +25,10 @@ export interface IOrder extends Document {
         | "cancelled";
     deliveryAddress: string;
     contactNumber: string;
-    paymentMethod: "paystack" | "card" | "cash-on-delivery";
-    transactionRef?: string;
+    paymentMethod: "paystack" | "hubtel" | "cash-on-delivery";
+    transactionRef?: string; //paystack reference
+    receiptUrl?: string; //uploaded pdf url
+    metadata?:Record<string, any>; //optional analytics
     createdAt: Date;
     updatedAt: Date;
 }
@@ -34,11 +36,11 @@ export interface IOrder extends Document {
 const OrderItemSchema = new Schema<IOrderItem>({
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: { type: String, required: true },
-    thumbnail: { type: String, required: true },
-    unitPrice: { type: Number, required: true },
-    quantity: { type: Number, required: true },
-    total: { type: Number, required: true },
-});
+    thumbnail: { type: String },
+    unitPrice: { type: Number, min: 0 },
+    quantity: { type: Number, required: true, min: 1 },
+    total: { type: Number, required: true, min: 0 }
+}, { _id: false });
 
 const OrderSchema = new Schema<IOrder>(
     {
@@ -60,7 +62,7 @@ const OrderSchema = new Schema<IOrder>(
                 "preparing",
                 "on-delivery",
                 "delivered",
-                "cancelled",
+                "canceled",
             ],
             default: "pending",
         },
@@ -68,19 +70,25 @@ const OrderSchema = new Schema<IOrder>(
         contactNumber: { type: String, required: true },
         paymentMethod: {
             type: String,
-            enum: ["paystack", "card", "cash-on-delivery"],
+            enum: ["paystack", "hubtel", "cash-on-delivery"],
             default: "paystack",
         },
         transactionRef: { type: String },
+        receiptUrl: { type: String },
+        metadata: { type: Schema.Types.Mixed, default: {} }
     },
     { timestamps: true }
 );
 
-// Auto-calc totals
+//Auto-calc totals
 OrderSchema.pre("validate", function (next) {
-    this.subtotal = this.items.reduce((sum, item) => sum + item.total, 0);
-    this.totalAmount = this.subtotal + this.deliveryFee;
-    next();
+    try {
+        this.subtotal = this.items.reduce((s: number, it: any) => s + (it.total || 0), 0);
+        this.totalAmount = (this.subtotal || 0) + (this.deliveryFee || 0);
+        next();
+    } catch (err) {
+        next(err as any);
+    }
 });
 
 //INDEXES for super-fast queries
@@ -88,6 +96,7 @@ OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ orderId: 1 });
 OrderSchema.index({ paymentStatus: 1 });
 OrderSchema.index({ orderStatus: 1 });
+OrderSchema.index({ transactionRef: 1 });
 
 const Order: Model<IOrder> = mongoose.model<IOrder>("Order", OrderSchema);
 export default Order;
