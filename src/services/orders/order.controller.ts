@@ -9,6 +9,7 @@ import { sendEmail } from '../../utils/email.transporter';
 import { sendSMS } from "../../utils/sendSMS";
 import { withTimeout } from "../../utils/helpers/timeOut";
 import { cloudinaryHelper } from "../../utils/helpers/cloudinaryHelper";
+import { notifyUserAsync } from "../../utils/helpers/notifyUserAsync";
 import {generateReceiptPdfBuffer} from "../../utils/receiptGenerator";
 import crypto from "crypto";
 
@@ -103,7 +104,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
 };
 
 
-//@route POST /api/v1/store/customer/orders/:orderId/initiate-dashboard overview
+//@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
 //@desc Customer initiate dashboard overview.
 //initiatePayment - initialize Paystack transaction using locked order total.
 //@access Private (Customer only)
@@ -119,7 +120,6 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
         if (!user || !user.email) {
             return res.status(400).json({ success: false, message: "Valid user email not found" });
         }
-        console.log(user.email);
 
         const order = await Order.findOne({ orderId, userId });
         if (!order) {
@@ -322,85 +322,298 @@ export const paystackWebhook = async (req: Request, res: Response) => {
 };
 
 
-//@route GET /api/v1/store/customer/orders
+//@route GET /api/v1/store/customer/order-history
 //@desc Fetch customer orders
 //@access Private (Customer only)
-export const getMyOrders = async (req: AuthRequest, res: Response) => {
+export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-
-        const cached = await redisClient.get(`orders:${userId}`);
-        if (cached) {
-            return res.json({ success: true, cached: true, data: JSON.parse(cached) });
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+            return;
         }
 
-        const orders = await Order.find({ userId }).sort({ createdAt: -1 }).lean();
-        await redisClient.setex(`orders:${userId}`, 300, JSON.stringify(orders));
-        return res.json({ success: true, data: orders });
+        // Pagination
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const skip = (page - 1) * limit;
+
+        // Optional: filter by status
+        const status = req.query.status as string;
+        const statusFilter = status ? { orderStatus: status } : {};
+
+        const query = { userId, ...statusFilter };
+
+        // Fetch orders + total count
+        const [orders, totalOrders] = await Promise.all([
+            Order.find(query)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .select("orderId items totalAmount orderStatus createdAt")
+                .lean(),
+
+            Order.countDocuments(query),
+        ]);
+
+        //Convert to UI-friendly format
+        const formattedOrders = orders.map(order => ({
+            orderId: order.orderId,
+            title: order.items?.[0]?.name || "Order Items",
+            image: order.items?.[0]?.thumbnail || null,
+            orderedOn: new Date(order.createdAt).toLocaleDateString("en-US", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+            }),
+            price: order.totalAmount,
+            status: order.orderStatus,
+        }));
+
+        res.status(200).json({
+            success: true,
+            message: "Order history fetched successfully",
+            meta: {
+                totalOrders,
+                totalPages: Math.ceil(totalOrders / limit),
+                currentPage: page,
+                limit,
+            },
+            data: formattedOrders,
+        });
+        return;
 
     } catch (error) {
         console.error("GetMyOrders error:", error);
-        res.status(500).json({ success: false, message: "Failed to fetch orders" });
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error: Failed to fetch orders",
+        });
         return;
     }
 };
 
 
 //@route GET /api/v1/dashboard/admin/orders
-//@desc Fetch customer orders to admin dashboard
+//@desc Fetch customer orders to admin dashboard with pagination and order statistics
 //@access Private (Admin only)
-export const getAllOrdersAdmin = async (req: AuthRequest, res: Response) => {
+export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const orders = await Order.find().populate("userId", "email name").sort({ createdAt: -1 }).lean();
-        res.json({ success: true, data: orders });
-        return;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const skip = (page - 1) * limit;
+
+        // --- ORDER STATISTICS ---
+        const orderStats = await Order.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalOrders: { $sum: 1 },
+                    pending: { $sum: { $cond: [{ $eq: ["$orderStatus", "pending"] }, 1, 0] } },
+                    preparing: { $sum: { $cond: [{ $eq: ["$orderStatus", "preparing"] }, 1, 0] } },
+                    delivered: { $sum: { $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0] } },
+                    cancelled: { $sum: { $cond: [{ $eq: ["$orderStatus", "cancelled"] }, 1, 0] } },
+                    totalRevenue: { $sum: "$totalAmount" }
+                }
+            }
+        ]);
+
+        // --- FETCH PAGINATED ORDERS ---
+        const rawOrders = await Order.find()
+            .populate<{ userId: { fullName?: string; email?: string } }>({ path: "userId", select: "fullName email" })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+
+        // --- FORMAT ORDERS FOR UI ---
+        const orders = rawOrders.map(order => ({
+            orderId: order.orderId,
+            customer: (order.userId as { fullName?: string })?.fullName || "Unknown",
+            email: (order.userId as { email?: string })?.email || "Unknown",
+            items: `${order.items.length} items`,
+            total: `GHS ${order.totalAmount.toFixed(2)}`,
+            status: order.orderStatus,
+            date: new Date(order.createdAt).toLocaleDateString("en-GB"), // DD/MM/YYYY
+        }));
+
+        const totalOrders = await Order.countDocuments();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                orders,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalOrders / limit),
+                    totalOrders,
+                    hasNext: skip + limit < totalOrders,
+                    hasPrev: page > 1
+                },
+                statistics:
+                    orderStats.length > 0
+                        ? {
+                            totalOrders: orderStats[0].totalOrders,
+                            pending: orderStats[0].pending,
+                            preparing: orderStats[0].preparing,
+                            delivered: orderStats[0].delivered,
+                            cancelled: orderStats[0].cancelled,
+                            totalRevenue: orderStats[0].totalRevenue
+                        }
+                        : {
+                            totalOrders: 0,
+                            pending: 0,
+                            preparing: 0,
+                            delivered: 0,
+                            cancelled: 0,
+                            totalRevenue: 0
+                        }
+            }
+        });
 
     } catch (error) {
         console.error("GetAllOrdersAdmin error:", error);
-        res.status(500).json({ success: false, message: "Failed to fetch all orders" });
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error: Failed to fetch all orders"
+        });
         return;
     }
 };
 
 
-//@route PATCH /api/v1/dashboard/admin/orders/status/:orderId/
-//@desc Toggle order status ("pending", "preparing", "on-delivery", "delivered", "canceled")
+//@route PATCH /api/v1/dashboard/admin/orders/status/:orderId/:status
+//@desc Toggle order status ("pending", "preparing", "on-delivery", "delivered", "cancelled")
 //@access Private (Admin only)
-export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
+export const updateOrderStatus = async (req: AuthRequest, res: Response):Promise<void> => {
     try {
-        const { orderId } = req.params;
-        const { status } = req.body;
+        const { orderId, status } = req.params;
 
-        const order = await Order.findOneAndUpdate(
-            { orderId },
-            { orderStatus: status },
-            { new: true }
-        );
-        //Send email and sms to customer about order status change
+        const validStatuses = ["pending", "preparing", "on-delivery", "delivered", "cancelled"];
+        if (!validStatuses.includes(status)) {
+            res.status(400).json({
+                success: false,
+                message: `Invalid status. Allowed: ${validStatuses.join(", ")}`
+            });
+            return;
+        }
 
-        res.json({ success: true, message: "Order updated", order });
+        // Find order with customer fields
+        const order = await Order.findOne({ orderId }).populate<{ userId: { fullName?: string; email?: string } }>({ path: "userId", select: "fullName email" });
+        if (!order) {
+            res.status(404).json({ success: false, message: "Order not found" });
+            return;
+        }
+
+        // Prevent updates to completed orders
+        if (["delivered", "cancelled"].includes(order.orderStatus)) {
+            res.status(400).json({
+                success: false,
+                message: `Cannot update a ${order.orderStatus} order`
+            });
+            return;
+        }
+
+        const orderStatus = status as "pending" | "preparing" | "on-delivery" | "delivered" | "cancelled";
+        order.orderStatus = orderStatus;
+
+        // Add to timeline
+        // order.orderTimeline.push({
+        //     status,
+        //     message: `Order marked as ${status} by admin`,
+        //     timestamp: new Date()
+        // });
+
+        await order.save();
+
+        await notifyUserAsync(order, { email: (order.userId as { email?: string })?.email || '', name: (order.userId as { fullName?: string })?.fullName }, orderStatus);
+
+        //response
+        res.status(200).json({
+            success: true,
+            message: `Order status updated to ${status}`,
+            order: {
+                orderId: order.orderId,
+                status: order.orderStatus,
+                items: `${order.items.length} items`,
+                total: `GHS ${order.totalAmount.toFixed(2)}`,
+                customer: (order.userId as { fullName?: string })?.fullName || "Unknown",
+                email: (order.userId as { email?: string })?.email || "Unknown",
+                date: new Date(order.createdAt).toLocaleDateString("en-GB"),
+            }
+        });
+        return;
+
     } catch (error) {
         console.error("Update order status error:", error);
-        res.status(500).json({ success: false, message: "Update failed" });
+        res.status(500).json({ success: false, message: "Internal Server Error: Update failed" });
         return;
     }
 };
 
 
-//@route PATCH /api/v1/dashboard/admin/orders/:orderId/
-//@desc Delete order permanently
+//@route DELETE /api/v1/dashboard/admin/orders/:orderId
+//@desc Delete order permanently (admin action)
 //@access Private (Admin only)
 export const deleteOrder = async (req: AuthRequest, res: Response) => {
     try {
         const { orderId } = req.params;
 
-        await Order.findOneAndDelete({ orderId });
+        const order = await Order.findOne({ orderId }).populate("userId");
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found",
+            });
+        }
 
-        res.json({ success: true, message: "Order deleted permanently" });
+        await Order.deleteOne({ orderId });
+
+        //Audit log
+        // await AdminLog.create({
+        //     admin: req.user?.id,
+        //     action: "ORDER_DELETE",
+        //     referenceId: orderId,
+        //     details: {
+        //         beforeDelete: order,
+        //     },
+        //     timestamp: new Date(),
+        // });
+
+        // 4. OPTIONAL: notify user non-blocking (if business requires)
+        await (async () => {
+            try {
+                if ((order.userId as { email?: string })?.email) {
+                    await sendEmail({
+                        email: (order.userId as { email?: string })?.email || '',
+                        subject: `Order ${orderId} Removed`,
+                        text: `
+Your order (ID: ${orderId}) has been removed from our system
+by Cozy Oven administration.
+
+If you believe this was a mistake, please contact support.
+                        `,
+                    });
+                }
+            } catch (notifyErr) {
+                console.error("Delete notification error:", notifyErr);
+            }
+        })();
+
+        return res.json({
+            success: true,
+            message: "Order deleted permanently",
+        });
+
     } catch (error) {
         console.error("Delete order error:", error);
-        res.status(500).json({ success: false, message: "Delete failed" });
+        return res.status(500).json({
+            success: false,
+            message: "Delete failed",
+        });
     }
 };
 
