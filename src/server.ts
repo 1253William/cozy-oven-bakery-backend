@@ -8,7 +8,7 @@ import SwaggerSpec from './services/swagger';
 import rootRouter from "./routes/index.route";
 import connectDB from "./config/db";
 import './workers/otpCleaner';
-// import { startStoreCacheJob } from "./workers/storeCacheJob";
+import { startStoreCacheJob } from "./workers/storeCacheJob";
 import http from 'http';
 
 dotenv.config();
@@ -78,7 +78,7 @@ app.use('*', (req, res) => {
 });
 
 //start store cache cron job
-// startStoreCacheJob();
+startStoreCacheJob();
 
 const PORT = parseInt(process.env.PORT as string, 10) || 5000;
 

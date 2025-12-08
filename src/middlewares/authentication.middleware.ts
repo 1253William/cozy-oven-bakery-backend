@@ -109,9 +109,6 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             return;
         }
 
-        // Log small debug (avoid leaking token payload in prod logs)
-        console.log("[auth] token decoded, sub/id:", (decoded as any).userId || (decoded as any).sub || "no-id");
-
         //Safe DB fetch with timeout
         let dbUser;
         try {
@@ -124,7 +121,6 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             //Use withTimeout around Mongoose findById
             dbUser = await withTimeout(User.findById(userId).select("+passwordChangedAt").lean());
         } catch (err: any) {
-            console.error("[auth] DB fetch error or timeout:", err?.message || err);
             res.status(503).json({ success: false, message: "Service unavailable (DB timeout). Try again later." });
             return;
         }
@@ -150,7 +146,6 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
             role: (dbUser as any).role || (decoded as any).role || "Customer"
         };
 
-        console.log("[auth] authenticated user:", (req as any).user.userId);
         next();
     } catch (err) {
         console.error("[auth] unexpected error:", err);

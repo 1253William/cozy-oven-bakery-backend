@@ -86,7 +86,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
         }), 8000);
 
         //Invalidate Redis cache
-        try { await redisClient.del(`orders:${userId}`); } catch (err) { console.warn("Redis del failed", err); }
+        // try { await redisClient.del(`orders:${userId}`); } catch (err) { console.warn("Redis del failed", err); }
 
         res.status(201).json({
             success: true,
@@ -103,8 +103,8 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
 };
 
 
-//@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
-//@desc Customer initiate payment.
+//@route POST /api/v1/store/customer/orders/:orderId/initiate-dashboard overview
+//@desc Customer initiate dashboard overview.
 //initiatePayment - initialize Paystack transaction using locked order total.
 //@access Private (Customer only)
 export const initiatePayment = async (req: AuthRequest, res: Response) => {
@@ -162,8 +162,8 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
 };
 
 
-//@route GET /api/v1/store/customer/payment/verify?reference=xxx
-//desc Verify payment. User-return verify (frontend calls after redirect)
+//@route GET /api/v1/store/customer/dashboard overview/verify?reference=xxx
+//desc Verify dashboard overview. User-return verify (frontend calls after redirect)
 //@access Private (Customer only)
 export const verifyPayment = async (req: AuthRequest, res: Response) => {
     try {
@@ -176,13 +176,12 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
         if (!user || !user.email) {
             return res.status(400).json({ success: false, message: "Valid user email not found" });
         }
-        console.log(user.email);
 
         const reference = String(req.query.reference || "");
         if (!reference) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid or missing payment reference",
+                message: "Invalid or missing dashboard overview reference",
             });
         }
 
@@ -309,7 +308,7 @@ export const paystackWebhook = async (req: Request, res: Response) => {
                             message: `Payment confirmed for order ${order.orderId}.`
                         }).catch(err => console.warn("SMS failed:", err));
                     } catch (err) {
-                        console.warn("Webhook post-payment tasks failed:", err);
+                        console.warn("Webhook post-dashboard overview tasks failed:", err);
                     }
                 }
             }
