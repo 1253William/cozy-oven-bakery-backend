@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../../types/authRequest";
 import Order from "../orders/order.model";
+import ProductModel from "../products/product.model";
 
 interface DashboardResponse {
     dailyStats: {
@@ -40,7 +41,7 @@ export const DashboardStats = async (req: AuthRequest, res: Response) => {
 
         // Get first day of current month
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        
+
         // Daily Sales Aggregation
         const dailySales = await Order.aggregate([
             {
@@ -89,9 +90,9 @@ endOfWeek.setHours(23, 59, 59, 999);
 const popularProduct = await Order.aggregate([
     {
         $match: {
-            createdAt: { 
-                $gte: startOfWeek, 
-                $lte: endOfWeek 
+            createdAt: {
+                $gte: startOfWeek,
+                $lte: endOfWeek
             },
             paymentStatus: "paid"
         }
@@ -154,12 +155,124 @@ const popularProduct = await Order.aggregate([
 };
 
 
-//@route GET /api/v1/dashboard/admin/products?popular=true
+//@route GET /api/v1/dashboard/admin/products?popular=true&page=1&limit=5
 //desc Fetch all popular products (i.e. most sold) and paginate 5 products per page
 //@access Private (Admin only)
+export const getPopularProducts = async (req: AuthRequest, res: Response): Promise<void>=> {
+    try {
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        //Aggregate most sold items
+        const popularAggregation = await Order.aggregate([
+            { $match: { paymentStatus: "paid" } },
+            { $unwind: "$items" },
+            {
+                $group: {
+                    _id: "$items.productId",
+                    totalSold: { $sum: "$items.quantity" }
+                }
+            },
+            { $sort: { totalSold: -1 } },
+            { $skip: skip },
+            { $limit: limit }
+        ]);
+
+        const productIds = popularAggregation.map(p => p._id);
+
+        //Fetch product details
+        const products = await ProductModel.find({
+            _id: { $in: productIds }
+        })
+            .select("productName productThumbnail price productStatus")
+            .lean();
+
+        //Merge sales data
+        const result = popularAggregation.map(p => {
+            const product = products.find(pr => String(pr._id) === String(p._id));
+            return {
+                productId: p._id,
+                productName: product?.productName,
+                thumbnail: product?.productThumbnail,
+                price: product?.price,
+                totalSold: p.totalSold,
+                status: product?.productStatus
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Popular products fetched successfully.",
+            page,
+            limit,
+            data: result
+        });
+        return;
+
+    } catch (error) {
+        console.error("Popular products error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error: Failed to fetch popular products"
+        });
+        return;
+    }
+};
 
 
-
-//@route GET /api/v1/dashboard/overview/sales?popular=true
+//@route GET /api/v1/dashboard/overview/sales?daily=true
 //desc Chart visualization data goes here: Showing daily data, monthly data, and popular bread
 //@access Private (Admin only)
+export const getSalesOverview = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { daily, monthly } = req.query;
+
+        let salesData;
+
+        if (daily === "true") {
+            salesData = await Order.aggregate([
+                { $match: { paymentStatus: "paid" } },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+                        },
+                        totalRevenue: { $sum: "$totalAmount" },
+                        orders: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: 1 } }
+            ]);
+        }
+
+        if (monthly === "true") {
+            salesData = await Order.aggregate([
+                { $match: { paymentStatus: "paid" } },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: { format: "%Y-%m", date: "$createdAt" }
+                        },
+                        totalRevenue: { $sum: "$totalAmount" },
+                        orders: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: 1 } }
+            ]);
+        }
+
+        res.status(200).json({
+            success: true,
+            mode: daily ? "daily" : "monthly",
+            data: salesData
+        });
+
+    } catch (error) {
+        console.error("Sales overview error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch sales overview"
+        });
+    }
+};
