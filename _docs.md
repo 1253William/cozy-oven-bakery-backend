@@ -15,41 +15,6 @@ and analytics for both web and event (POS) sales.
 - Localization for Ghana
 
 
-Products:
-
-
-##  Folder Structure (sample)
-
-cozy-oven-bakery-backend/
- ├── src/
- │ ├── config/
- │ │ ├── db.js
- │ │ └── cloudinary.js
- │ ├── controllers/
- │ │ ├── authController.js
- │ │ ├── productController.js
- │ │ ├── orderController.js
- │ │ └── syncController.js
- │ ├── middlewares/
- │ │ └── authMiddleware.js
- │ ├── models/
- │ │ ├── User.js
- │ │ ├── Product.js
- │ │ └── Order.js
- │ ├── routes/
- │ │ ├── authRoutes.js
- │ │ ├── productRoutes.js
- │ │ └── orderRoutes.js
- │ ├── utils/
- │ │ ├── email.js
- │ │ └── websocket.js
- │ ├── app.js
- │ └── server.js
- ├── .env.example
- ├── package.json
- └── README.md
-
-
 ## Setup Instructions
 
 ### 1. Clone Repository
@@ -118,7 +83,7 @@ Go to Render.com
 Create “Web Service”
 Connect repo → set npm run start as command
 Add environment variables
-Deploy 🎉
+Deploy 
 
 
 Integration with Frontend

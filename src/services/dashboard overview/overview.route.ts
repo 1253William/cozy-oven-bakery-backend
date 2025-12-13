@@ -18,7 +18,7 @@ const router = express.Router();
  *     tags:
  *       - Dashboard (Overview)
  *     summary: Get dashboard sales overview and weekly popular product
- *     description: Returns daily sales, monthly sales, and the most popular product for the current week. Admin access only.
+ *     description: Returns daily sales, monthly sales, and the best seller product for the current week and month. Admin access only.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -56,7 +56,7 @@ const router = express.Router();
  *                         orders:
  *                           type: number
  *                           example: 216
- *                     popularProductThisWeek:
+ *                     bestSellerThisWeek:
  *                       type: object
  *                       nullable: true
  *                       properties:
@@ -75,6 +75,22 @@ const router = express.Router();
  *                         productThumbnail:
  *                           type: string
  *                           example: "https://cdn.cozyoven.com/products/choco-bread.png"
+ *                     bestSellerThisMonth:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                        name:
+ *                         type: string
+ *                         example: "Vanilla Bread"
+ *                        productId:
+ *                           type: string
+ *                           example: "56379294839129f12e3e8"
+ *                        quantitySold:
+ *                           type: number
+ *                           example: 12
+ *                        productThumbnail:
+ *                           type: string
+ *                           example: "https://cdn.cozyoven.com/products/vanilla-bread.png"
  *       401:
  *         description: Unauthorized – Authentication required
  *         content:

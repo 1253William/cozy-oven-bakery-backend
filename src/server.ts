@@ -18,7 +18,7 @@ connectDB()
 
 const app = express();
 
-//Create an HTTP server for Socket.IO
+//Create an HTTP server
 const server = http.createServer(app);
 
 //Middlewares
@@ -72,7 +72,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// 404 handler
+//404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
@@ -80,8 +80,10 @@ app.use('*', (req, res) => {
 //start store cache cron job
 startStoreCacheJob();
 
+//PORT
 const PORT = parseInt(process.env.PORT as string, 10) || 5000;
 
+//Server
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running at http://0.0.0.0:${PORT}`);
 });

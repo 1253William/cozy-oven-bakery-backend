@@ -12,7 +12,14 @@ interface DashboardResponse {
         sales: number;
         orders: number;
     };
-    popularProductThisWeek: {
+    bestSellerThisWeek: {
+        name: string;
+        productId: string;
+        quantitySold: number;
+        revenue: number;
+        productThumbnail: string;
+    } | null;
+    bestSellerThisMonth: {
         name: string;
         productId: string;
         quantitySold: number;
@@ -76,48 +83,89 @@ export const DashboardStats = async (req: AuthRequest, res: Response) => {
             }
         ]);
 
-// Get start and end of current week (Sunday to Saturday)
-const now = new Date();
-const startOfWeek = new Date(now);
-startOfWeek.setDate(now.getDate() - now.getDay()); // Set to Sunday
-startOfWeek.setHours(0, 0, 0, 0);
+        //Get start and end of current week (Sunday to Saturday)
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Set to Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
 
-const endOfWeek = new Date(now);
-endOfWeek.setDate(now.getDate() + (6 - now.getDay())); // Set to Saturday
-endOfWeek.setHours(23, 59, 59, 999);
+        const endOfWeek = new Date(now);
+        endOfWeek.setDate(now.getDate() + (6 - now.getDay())); // Set to Saturday
+        endOfWeek.setHours(23, 59, 59, 999);
 
-// Get the single most popular product for current week
-const popularProduct = await Order.aggregate([
-    {
-        $match: {
-            createdAt: {
-                $gte: startOfWeek,
-                $lte: endOfWeek
+
+        //Get start and end of current month
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+
+        //Get the single most popular product for current week
+        const popularProduct = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: {
+                        $gte: startOfWeek,
+                        $lte: endOfWeek
+                    },
+                    paymentStatus: "paid"
+                }
             },
-            paymentStatus: "paid"
-        }
-    },
-    {
-        $unwind: "$items"
-    },
-    {
-        $group: {
-            _id: {
-                productId: "$items.productId",
-                name: "$items.name",
-                productThumbnail: "$items.thumbnail"
+            {
+                $unwind: "$items"
             },
-            totalQuantity: { $sum: "$items.quantity" },
-            totalRevenue: { $sum: "$items.total" }
-        }
-    },
-    {
-        $sort: { totalQuantity: -1 }
-    },
-    {
-        $limit: 1
-    }
-]);
+            {
+                $group: {
+                    _id: {
+                        productId: "$items.productId",
+                        name: "$items.name",
+                        productThumbnail: "$items.thumbnail"
+                    },
+                    totalQuantity: { $sum: "$items.quantity" },
+                    totalRevenue: { $sum: "$items.total" }
+                }
+            },
+            {
+                $sort: { totalQuantity: -1 }
+            },
+            {
+                $limit: 1
+            }
+        ]);
+
+        // Get the single most popular product for current month
+        const popularProductThisMonth = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: {
+                        $gte: startOfMonth,
+                        $lte: endOfMonth
+                    },
+                    paymentStatus: "paid"
+                }
+            },
+            {
+                $unwind: "$items"
+            },
+            {
+                $group: {
+                    _id: {
+                        productId: "$items.productId",
+                        name: "$items.name",
+                        productThumbnail: "$items.thumbnail"
+                    },
+                    totalQuantity: { $sum: "$items.quantity" },
+                    totalRevenue: { $sum: "$items.total" }
+                }
+            },
+            {
+                $sort: { totalQuantity: -1 }
+            },
+            {
+                $limit: 1
+            }
+        ]);
 
         const response: DashboardResponse = {
             dailyStats: {
@@ -128,13 +176,22 @@ const popularProduct = await Order.aggregate([
                 sales: monthlySales[0]?.totalSales || 0,
                 orders: monthlySales[0]?.orderCount || 0
             },
-            popularProductThisWeek: popularProduct[0] ? {
+            bestSellerThisWeek: popularProduct[0] ? {
                 name: popularProduct[0]._id.name,
                 productId: popularProduct[0]._id.productId,
                 quantitySold: popularProduct[0].totalQuantity,
                 revenue: popularProduct[0].totalRevenue,
                 productThumbnail: popularProduct[0]._id.productThumbnail
-            } : null
+            } : null,
+            bestSellerThisMonth: popularProductThisMonth[0]
+                ? {
+                    name: popularProductThisMonth[0]._id.name,
+                    productId: popularProductThisMonth[0]._id.productId,
+                    quantitySold: popularProductThisMonth[0].totalQuantity,
+                    revenue: popularProductThisMonth[0].totalRevenue,
+                    productThumbnail: popularProductThisMonth[0]._id.productThumbnail
+                }
+                : null
         };
 
         res.status(200).json({
