@@ -12,6 +12,8 @@ export type User = Document & {
     role: 'Customer' | 'Admin';
     passwordChangedAt?: Date;
     isAccountVerified?: boolean;
+    isActive?: boolean;
+    lastLoginAt?: Date;
     isAccountDeleted?: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -68,6 +70,13 @@ const UserSchema: Schema<User> = new Schema(
         isAccountDeleted: {
             type: Boolean,
             default: false,
+        },
+        isActive: {
+            type: Boolean,
+            default: false,
+        },
+        lastLoginAt: {
+            type: Date,
         },
     },
     {

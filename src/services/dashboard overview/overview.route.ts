@@ -17,7 +17,7 @@ const router = express.Router();
  *   get:
  *     tags:
  *       - Dashboard (Overview)
- *     summary: Get dashboard sales overview and weekly popular product
+ *     summary: Get dashboard sales overview, weekly and monthly best seller product
  *     description: Returns daily sales, monthly sales, and the best seller product for the current week and month. Admin access only.
  *     security:
  *       - bearerAuth: []

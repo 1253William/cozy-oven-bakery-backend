@@ -212,19 +212,27 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    //Create JWT access token
-    const accessToken = jwt.sign(
-      {
-        userId: matchedUser._id,
-        email: matchedUser.email,
-        role: matchedUser.role
-      },
-      process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: "1h", algorithm: "HS256" }
+    //After successful password verification and before creating the JWT token in the login controller:
+    //Set user as active
+    const updatedUser = await UserModel.findByIdAndUpdate(
+        matchedUser._id,
+        { isActive: true, lastLoginAt: new Date() },
+        { new: true }
     );
 
-    //Prepare safe user object
-    const { password: _, ...safeUser } = matchedUser.toObject();
+    //Create JWT access token
+    const accessToken = jwt.sign(
+        {
+            userId: updatedUser!._id,
+            email: updatedUser!.email,
+            role: updatedUser!.role
+        },
+        process.env.ACCESS_TOKEN_SECRET!,
+        { expiresIn: "1h", algorithm: "HS256" }
+    );
+
+    //Safe Password
+    const { password: _, ...safeUser } = updatedUser!.toObject();
 
     //Log processing time
     const elapsedTime = Date.now() - start;

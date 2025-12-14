@@ -40,16 +40,16 @@ export const DashboardStats = async (req: AuthRequest, res: Response) => {
             return;
         }
 
-        // Get today's date (start and end)
+        //Get today's date (start and end)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // Get first day of current month
+        //Get first day of current month
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-        // Daily Sales Aggregation
+        //Daily Sales Aggregation
         const dailySales = await Order.aggregate([
             {
                 $match: {
@@ -66,7 +66,7 @@ export const DashboardStats = async (req: AuthRequest, res: Response) => {
             }
         ]);
 
-        // Monthly Sales Aggregation
+        //Monthly Sales Aggregation
         const monthlySales = await Order.aggregate([
             {
                 $match: {
@@ -134,7 +134,7 @@ export const DashboardStats = async (req: AuthRequest, res: Response) => {
             }
         ]);
 
-        // Get the single most popular product for current month
+        //Get the single most popular product for current month
         const popularProductThisMonth = await Order.aggregate([
             {
                 $match: {

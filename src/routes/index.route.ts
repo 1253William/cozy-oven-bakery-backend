@@ -6,6 +6,7 @@ import productRouter from "../services/products/product.route"
 import orderRouter from "../services/orders/order.route";
 import settingsRouter from "../services/account/profile.route";
 import dashboardRouter from "../services/dashboard overview/overview.route";
+import customerRouter from "../services/customers/customers.route";
 // import searchRouter from "../services/globals/search.routes";
 // import inventoryRouter from "../services/inventory/inventory.route";
 // import notificationRouter from "./notification.route";
@@ -22,9 +23,6 @@ rootRouter.use('/status',userRouter);
 //Account routes
 rootRouter.use('/account', settingsRouter);
 
-//Customer routes
-// rootRouter.use('/customers', customerRouter);
-
 //Product routes
 rootRouter.use('/', productRouter);
 
@@ -33,6 +31,9 @@ rootRouter.use('/', orderRouter);
 
 //Admin Dashboard Overview
 rootRouter.use('/dashboard',dashboardRouter);
+
+//Admin Customer routes
+rootRouter.use('/dashboard', customerRouter);
 
 //Search routes
 // rootRouter.use('/search', searchRouter);
