@@ -7,6 +7,7 @@ import orderRouter from "../services/orders/order.route";
 import settingsRouter from "../services/account/profile.route";
 import dashboardRouter from "../services/dashboard overview/overview.route";
 import customerRouter from "../services/customers/customers.route";
+import reportRouter from "../services/reports/reports.route";
 // import searchRouter from "../services/globals/search.routes";
 import inventoryRouter from "../services/inventory/inventory.route";
 // import notificationRouter from "./notification.route";
@@ -30,7 +31,7 @@ rootRouter.use('/', productRouter);
 rootRouter.use('/', orderRouter);
 
 //Admin Dashboard Overview
-rootRouter.use('/dashboard',dashboardRouter, inventoryRouter);
+rootRouter.use('/dashboard',dashboardRouter, inventoryRouter, reportRouter);
 
 //Admin Customer routes
 rootRouter.use('/dashboard', customerRouter);
