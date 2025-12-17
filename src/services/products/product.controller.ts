@@ -141,7 +141,7 @@ export const getAllProductsAdmin = async (req: AuthRequest, res: Response): Prom
         if(category) query.productCategory = category;
 
         //Redis cache
-        const redisKey = `products:admin:page:${page}:limit:${limit}:cat:${category || "all"}:sort:${sortBy}:${order}`;
+       // const redisKey = `products:admin:page:${page}:limit:${limit}:cat:${category || "all"}:sort:${sortBy}:${order}`;
 
         // const cachedData = await redisClient.get(redisKey);
         // let cachedData: string | null = null;
@@ -218,7 +218,7 @@ export const getProductByIdAdmin = async (req: AuthRequest, res: Response): Prom
         }
 
         const { productId } = req.params;
-        const cacheKey = `product:${productId}`;
+      //  const cacheKey = `product:${productId}`;
         //
         // const start = performance.now();
         //

@@ -8,7 +8,7 @@ import settingsRouter from "../services/account/profile.route";
 import dashboardRouter from "../services/dashboard overview/overview.route";
 import customerRouter from "../services/customers/customers.route";
 // import searchRouter from "../services/globals/search.routes";
-// import inventoryRouter from "../services/inventory/inventory.route";
+import inventoryRouter from "../services/inventory/inventory.route";
 // import notificationRouter from "./notification.route";
 
 const rootRouter = express.Router();
@@ -30,7 +30,7 @@ rootRouter.use('/', productRouter);
 rootRouter.use('/', orderRouter);
 
 //Admin Dashboard Overview
-rootRouter.use('/dashboard',dashboardRouter);
+rootRouter.use('/dashboard',dashboardRouter, inventoryRouter);
 
 //Admin Customer routes
 rootRouter.use('/dashboard', customerRouter);
