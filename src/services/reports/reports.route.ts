@@ -2,6 +2,7 @@ import express from 'express';
 import { authMiddleware } from "../../middlewares/authentication.middleware";
 import { authorizedRoles } from "../../middlewares/roles.middleware";
 import {
+    // exportMonthlyReport,
     monthlyFinanceSummary, salesByCategory, topCustomers, topSellingProducts
 
 } from "./reports.controller";
@@ -243,5 +244,48 @@ router.get('/admin/reports/top-selling-products', authMiddleware, authorizedRole
 //desc Fetch top customers
 //@access Private (Admin only)
 router.get('/admin/reports/top-customers', authMiddleware, authorizedRoles("Admin"), topCustomers );
+
+// /**
+//  * @swagger
+//  * /api/v1/dashboard/admin/reports/export?month=12&year=2025&format=csv:
+//  *   get:
+//  *     summary: Export monthly business report
+//  *     description: Export financial and analytics report for a given month and year.
+//  *     tags:
+//  *       - Reports & Analytics
+//  *     security:
+//  *       - bearerAuth: []
+//  *     parameters:
+//  *       - in: query
+//  *         name: month
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           example: "08"
+//  *       - in: query
+//  *         name: year
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           example: "2025"
+//  *       - in: query
+//  *         name: format
+//  *         required: false
+//  *         schema:
+//  *           type: string
+//  *           enum: [csv]
+//  *     responses:
+//  *       200:
+//  *         description: Report exported successfully
+//  *       404:
+//  *         description: Report not found
+//  *       500:
+//  *         description: Server error
+//  */
+//@route GET /api/v1/dashboard/admin/reports/export?month=12&year=2025&format=csv
+//@desc Export monthly report
+//@access Private (Admin only)
+// router.get('/admin/reports/export', authMiddleware, authorizedRoles("Admin"),exportMonthlyReport);
+
 
 export default router;

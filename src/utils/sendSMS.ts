@@ -9,12 +9,17 @@ interface SMSPayload {
 }
 
 export const sendSMS = async ({
-                                  recipient,
-                                  message,
-                                  sender = process.env.MNOTIFY_SENDER_ID || "Cozy Oven",
-                                  is_schedule = false,
-                                  schedule_date = "",
-                              }: SMSPayload): Promise<void> => {
+    recipient,
+    message,
+    sender = process.env.MNOTIFY_SENDER_ID || "Cozy Oven",
+    is_schedule = false,
+    schedule_date = "",
+}: SMSPayload): Promise<boolean> => {
+    if (!process.env.MNOTIFY_API_KEY) {
+        console.error("MNOTIFY_API_KEY is not configured");
+        return false;
+    }
+
     try {
         const response = await axios.post(
             `https://api.mnotify.com/api/sms/quick?key=${process.env.MNOTIFY_API_KEY}`,
@@ -32,10 +37,13 @@ export const sendSMS = async ({
 
         if (response.data.status !== "success") {
             console.error("SMS not sent:", response.data);
-        } else {
-            console.log("SMS sent successfully:", response.data.summary);
+            return false;
         }
+        
+        console.log("SMS sent successfully:", response.data.summary);
+        return true;
     } catch (error) {
         console.error("Error sending SMS:", error);
+        return false;
     }
-};
+}

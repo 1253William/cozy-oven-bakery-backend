@@ -57,7 +57,7 @@ export const monthlyFinanceSummary = async (req: AuthRequest, res: Response) => 
             {
                 month,
                 year,
-                totalSales,
+                totalRevenue: totalSales,
                 totalExpenses,
                 profit,
                 profitMargin
@@ -286,3 +286,130 @@ export const topCustomers = async (req: AuthRequest, res: Response) => {
         return;
     }
 };
+
+// const monthMap: Record<string, string> = {
+//     "01": "January",
+//     "02": "February",
+//     "03": "March",
+//     "04": "April",
+//     "05": "May",
+//     "06": "June",
+//     "07": "July",
+//     "08": "August",
+//     "09": "September",
+//     "10": "October",
+//     "11": "November",
+//     "12": "December"
+// };
+// const normalizeMonth = (month: any): string =>
+//     monthMap[String(month).padStart(2, "0")] || month;
+//@route GET /api/v1/dashboard/admin/reports/export?month=12&year=2025&format=csv
+//@desc Export monthly financial report
+//@access Private (Admin only)
+// export const exportMonthlyReport = async (req: AuthRequest, res: Response) => {
+//     try {
+//         const { month, year, format = "csv" } = req.query;
+//
+//         if (!month || !year) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Month and year are required"
+//             });
+//         }
+//
+//         const normalizedMonth = normalizeMonth(month);
+//
+//         const report = await Report.findOne({
+//             month: normalizedMonth,
+//             year: String(year)
+//         });
+//
+//         if (!report) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "No report found for selected period"
+//             });
+//         }
+//
+//         const topProducts = await Order.aggregate([
+//             {
+//                 $match: {
+//                     paymentStatus: "paid",
+//                     orderMonth: normalizedMonth,
+//                     orderYear: String(year)
+//                 }
+//             },
+//             { $unwind: "$items" },
+//             {
+//                 $group: {
+//                     _id: "$items.name",
+//                     unitsSold: { $sum: "$items.quantity" },
+//                     revenue: { $sum: "$items.total" }
+//                 }
+//             },
+//             { $sort: { revenue: -1 } },
+//             { $limit: 5 }
+//         ]);
+//
+//         const topCustomers = await Order.aggregate([
+//             {
+//                 $match: {
+//                     paymentStatus: "paid",
+//                     orderMonth: normalizedMonth,
+//                     orderYear: String(year)
+//                 }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$userId",
+//                     totalOrders: { $sum: 1 },
+//                     totalSpent: { $sum: "$totalAmount" }
+//                 }
+//             },
+//             { $sort: { totalSpent: -1 } },
+//             { $limit: 5 }
+//         ]);
+//
+//         if (format !== "csv") {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Only CSV export is supported"
+//             });
+//         }
+//
+//         let csv = "";
+//         csv += "MONTH,YEAR\n";
+//         csv += `${normalizedMonth},${year}\n\n`;
+//
+//         csv += "FINANCIAL SUMMARY\n";
+//         csv += "Total Revenue,Total Expenses,Profit,Profit Margin\n";
+//         csv += `${report.totalRevenue},${report.totalExpenses},${report.profit},${report.profitMargin}%\n\n`;
+//
+//         csv += "TOP SELLING PRODUCTS\n";
+//         csv += "Product Name,Units Sold,Revenue\n";
+//         topProducts.forEach(p => {
+//             csv += `${p._id},${p.unitsSold},${p.revenue}\n`;
+//         });
+//
+//         csv += "\nTOP CUSTOMERS\n";
+//         csv += "Customer ID,Total Orders,Total Spent\n";
+//         topCustomers.forEach(c => {
+//             csv += `${c._id},${c.totalOrders},${c.totalSpent}\n`;
+//         });
+//
+//         res.setHeader("Content-Type", "text/csv");
+//         res.setHeader(
+//             "Content-Disposition",
+//             `attachment; filename=monthly-report-${normalizedMonth}-${year}.csv`
+//         );
+//
+//         res.status(200).send(csv);
+//
+//     } catch (error) {
+//         console.error("Export error:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Failed to export report"
+//         });
+//     }
+// };

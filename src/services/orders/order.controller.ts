@@ -10,6 +10,7 @@ import { sendSMS } from "../../utils/sendSMS";
 import { withTimeout } from "../../utils/helpers/timeOut";
 import { cloudinaryHelper } from "../../utils/helpers/cloudinaryHelper";
 import { notifyUserAsync } from "../../utils/helpers/notifyUserAsync";
+import { createNotification } from "../notifications/notification.service";
 import {generateReceiptPdfBuffer} from "../../utils/receiptGenerator";
 import crypto from "crypto";
 
@@ -172,7 +173,7 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
             res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
             return;
         }
-        const user = await UserModel.findById(userId).select("email").lean();
+        const user = await UserModel.findById(userId).select("email fullName").lean();
         if (!user || !user.email) {
             return res.status(400).json({ success: false, message: "Valid user email not found" });
         }
@@ -230,6 +231,17 @@ Total Paid: GHS ${order.totalAmount}
 Thank you for ordering from Cozy Oven!
         `,
             });
+
+            //New Order Notification
+            await createNotification({
+                title: "New Order Received",
+                message: `Order #${order.orderId} has been placed by ${user.fullName}`,
+                type: "order",
+                metadata: {
+                    orderId: order._id
+                }
+            });
+
 
             //SMS
             await sendSMS({
@@ -530,6 +542,23 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response):Promise
         await order.save();
 
         await notifyUserAsync(order, { email: (order.userId as { email?: string })?.email || '', name: (order.userId as { fullName?: string })?.fullName }, orderStatus);
+
+        try {
+
+            if (orderStatus === "delivered") {
+                await createNotification({
+                    title: "Order Delivered",
+                    message: `Order #${order.orderId} has been successfully delivered`,
+                    type: "order",
+                    metadata: {
+                        orderId: order._id
+                    }
+                });
+            }
+
+        } catch (notifyErr) {
+            console.warn("Notification (email/SMS) failed:", notifyErr);
+        }
 
         //response
         res.status(200).json({

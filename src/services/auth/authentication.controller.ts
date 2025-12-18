@@ -7,8 +7,9 @@ import OTPVerification from './OTPVerification.model';
 import {CustomJwtPayload} from '../../types/authRequest';
 import { sendEmail } from '../../utils/email.transporter';
 import { sendSMS } from "../../utils/sendSMS";
-
+import { createNotification } from "../notifications/notification.service";
 import redisClient from '../../config/redis';
+
 
 require('dotenv').config();
 
@@ -143,15 +144,43 @@ Thank you for choosing Cozy Oven — we can’t wait to bake something amazing f
             text: emailText,
         });
 
-        //Send SMS notification
-        const firstName = newUser.fullName.split(" ")[0];
-        const smsMessage = `Welcome to Cozy Oven, ${firstName}! Your account’s ready. Visit www.cozyoven.store to order your favorite banana bread today!`;
-
-        //Fire and forget — no blocking response
-        await sendSMS({
-            recipient: [newUser.phoneNumber],
-            message: smsMessage,
+        //System Notification
+        await createNotification({
+            title: "New Customer SignUp",
+            message: `A new customer signed up: ${newUser.fullName}`,
+            type: "system",
+            metadata: {
+                customerId: newUser._id,
+                customerEmail: newUser.email,
+            }
         });
+
+        // Send SMS notification
+        const firstName = newUser.fullName.split(" ")[0];
+        const smsMessage = `Welcome to Cozy Oven, ${firstName}! Your account's ready. Visit www.cozyoven.store to order your favorite banana bread today!`;
+
+        try {
+            const smsSent = await sendSMS({
+                recipient: [newUser.phoneNumber],
+                message: smsMessage,
+            });
+            
+            if (!smsSent) {
+                console.error(`Failed to send welcome SMS to user ${newUser._id}`);
+                // Optionally create a notification for admins about SMS failure
+                await createNotification({
+                    title: "SMS Delivery Failed",
+                    message: `Welcome SMS failed to send to new user: ${newUser.fullName}`,
+                    type: "system",
+                    metadata: {
+                        customerId: newUser._id,
+                        customerPhone: newUser.phoneNumber,
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("SMS sending error:", error);
+        }
 
         res.status(201).json({
             success: true,

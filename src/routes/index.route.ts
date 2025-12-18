@@ -10,7 +10,7 @@ import customerRouter from "../services/customers/customers.route";
 import reportRouter from "../services/reports/reports.route";
 // import searchRouter from "../services/globals/search.routes";
 import inventoryRouter from "../services/inventory/inventory.route";
-// import notificationRouter from "./notification.route";
+import notificationRouter from "../services/notifications/notification.route";
 
 const rootRouter = express.Router();
 
@@ -40,7 +40,7 @@ rootRouter.use('/dashboard', customerRouter);
 // rootRouter.use('/search', searchRouter);
 
 //Notification routes
-// rootRouter.use('/notifications', notificationRouter);
+rootRouter.use('/dashboard', notificationRouter);
 
 rootRouter.get("/auth-test", authMiddleware, (req, res) => {
     res.json({ ok: true, user: (req as any).user });
