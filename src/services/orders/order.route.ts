@@ -49,9 +49,6 @@ const router = express.Router();
  *                       type: number
  *                     unitPrice:
  *                       type: number
- *               deliveryFee:
- *                 type: number
- *                 example: 10
  *               deliveryAddress:
  *                 type: string
  *                 example: Dansoman Roundabout

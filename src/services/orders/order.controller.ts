@@ -177,6 +177,7 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
+        const userEmail = await UserModel.findById(userId).select("email").lean();
 
         const order = await Order.findOne({ orderId, userId });
         if (!order) {
@@ -195,6 +196,7 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
             cancellationUrl: `${process.env.FRONTEND_URL}/checkout/cancel`,
             merchantAccountNumber: process.env.HUBTEL_MERCHANT_ID,
             clientReference: order.orderId,
+            payeeEmail: userEmail
         };
 
         const response = await hubtel.post(
@@ -345,9 +347,14 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
     try {
         const status = req.body?.Data?.Status;
         const clientReference = req.body?.Data?.ClientReference;
+        const payee = req.body?.Data?.PayeeEmail;
 
         if (status !== "Success" || !clientReference) {
             return res.status(200).send("Ignored: Invalid status or clientReference");
+        }
+
+        if(!payee) {
+            return res.status(200).send("Ignored: Invalid payee");
         }
 
         const order = await Order.findOne({ orderId: clientReference });
@@ -356,10 +363,27 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
             return res.status(200).send("OK");
         }
 
-        if (order.paymentStatus !== "paid") {
+        if (!order || order.paymentStatus !== "paid") {
             order.paymentStatus = "paid";
             order.paidAt = new Date();
             await order.save();
+
+            //EMAIL
+            await sendEmail({
+                email: payee,
+                subject: `Payment Successful - Order ${order.orderId}`,
+                text: `
+Your payment was successful.
+
+Order ID: ${order.orderId}
+Total Paid: GHS ${order.totalAmount}
+
+Thank you for ordering from Cozy Oven!
+
+©Cozy Oven Store. All rights reserved
+        `,
+            });
+
 
             //Notifications (safe async)
             await createNotification({
@@ -383,6 +407,7 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
         return res.status(200).send("error: An error occurred while processing the webhook");
     }
 };
+
 
 //CRON job
 //Outbound IPs whitelisted
