@@ -108,7 +108,7 @@ router.post("/store/customer/orders/checkout", authMiddleware,authorizedRoles("C
  *         description: Payment initialization failed
  */
 //@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
-//@desc Customer initiate dashboard overview.
+//@desc Customer initiate dashboard overview
 //@access Private (Customer only)
 router.post("/store/customer/orders/:orderId/initiate-payment", authMiddleware,authorizedRoles("Customer"), initiatePayment);
 
