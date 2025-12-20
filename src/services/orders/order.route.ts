@@ -4,10 +4,9 @@ import { authorizedRoles } from "../../middlewares/roles.middleware";
 import {
     checkOut,
     initiatePayment,
-    verifyPayment,
+    hubtelWebhook,
     getMyOrders,
     getReceipt,
-    paystackWebhook,
     getAllOrdersAdmin,
     updateOrderStatus,
     deleteOrder,
@@ -61,7 +60,7 @@ const router = express.Router();
  *                 example: 0558288424
  *               paymentMethod:
  *                 type: string
- *                 example: paystack
+ *                 example: hubtel
  *     responses:
  *       201:
  *         description: Order created successfully
@@ -113,39 +112,11 @@ router.post("/store/customer/orders/checkout", authMiddleware,authorizedRoles("C
 //@access Private (Customer only)
 router.post("/store/customer/orders/:orderId/initiate-payment", authMiddleware,authorizedRoles("Customer"), initiatePayment);
 
-/**
- * @swagger
- * /api/v1/store/customer/payment/verify?reference=1234557888:
- *   get:
- *     summary: Verify payment after redirection
- *     description: Verifies transaction and updates order payment status. Customer access only.
- *     tags:
- *       - Orders (Customer)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: reference
- *         required: true
- *         schema:
- *           type: string
- *         description: Payment transaction reference
- *     responses:
- *       200:
- *         description: Payment verified successfully
- *       400:
- *         description: Payment not successful
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Order not found
- *       500:
- *         description: Verification failed
- */
-//@route GET /api/v1/store/customer/dashboard overview/verify?reference=xxx
-//desc Verify dashboard overview. User-return verify (frontend calls after redirect)
-//@access Private (Customer only)
-router.get("/store/customer/payment/verify", authMiddleware, authorizedRoles("Customer"), verifyPayment);
+//Webhook
+//@route POST /api/v1/webhooks/hubtel
+//@desc Hubtel webhook listener
+//@access Public (Hubtel Webhook)
+router.post("/webhooks/hubtel", hubtelWebhook);
 
 /**
  * @swagger
@@ -173,8 +144,7 @@ router.get("/store/customer/order-history", authMiddleware,authorizedRoles("Cust
 
 router.get("/store/customer/orders/:orderId/receipt", authMiddleware, authorizedRoles("Customer"), getReceipt);
 
-//Webhook (no auth, but validates signature)
-// router.post("/webhooks/paystack", express.json({ type: "*/*" }), paystackWebhook);
+
 
 
 //Admin Order routes

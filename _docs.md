@@ -153,7 +153,6 @@ Folders:
 99_Utilities (seed DB, clear DB, generate JWT)
 
 
+https://cozy-oven-bakery-backend.onrender.com/api/v1/store/customer/orders/CZ-123456/initiate-payment
 
-//Webhook listener for Paystack
-//Order analytics pipeline
-//Add Auto-invoice & receipt generator
+https://cozy-oven-bakery-backend.onrender.com/api/v1/store/webhooks/hubtel

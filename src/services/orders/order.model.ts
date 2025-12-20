@@ -17,6 +17,7 @@ export interface IOrder extends Document {
     deliveryFee: number;
     totalAmount: number;
     paymentStatus: "pending" | "paid" | "failed" | "refunded";
+    paidAt?: Date;
     orderStatus:
         | "pending"
         | "preparing"
@@ -55,6 +56,7 @@ const OrderSchema = new Schema<IOrder>(
             enum: ["pending", "paid", "failed", "refunded"],
             default: "pending",
         },
+        paidAt: { type: Date },
         orderStatus: {
             type: String,
             enum: [

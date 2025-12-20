@@ -5,14 +5,17 @@ import ProductModel from "../products/product.model";
 import UserModel from "../account/user.model"
 import redisClient from "../../config/redis";
 import paystack from "../../config/paystack";
+import hubtel from "../../config/hubtel";
 import { sendEmail } from '../../utils/email.transporter';
 import { sendSMS } from "../../utils/sendSMS";
 import { withTimeout } from "../../utils/helpers/timeOut";
 import { cloudinaryHelper } from "../../utils/helpers/cloudinaryHelper";
 import { notifyUserAsync } from "../../utils/helpers/notifyUserAsync";
 import { createNotification } from "../notifications/notification.service";
+import { hubtelStatusClient } from "../../utils/helpers/hubtelStatusClient";
 import {generateReceiptPdfBuffer} from "../../utils/receiptGenerator";
 import crypto from "crypto";
+
 
 //@route POST /api/v1/store/customer/orders/checkout
 //@desc Customer place order and check out.  Checkout: create order and lock totals.
@@ -68,7 +71,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
                 total
             });
         }
-        const subtotal = enrichedItems.reduce((s, i) => s + i.total, 0);
+        const subtotal = Number(enrichedItems.reduce((s, i) => s + i.total, 0).toFixed(2));
         const totalAmount = subtotal + Number(deliveryFee || 0);
         //Auto-generate unique order ID like: CZ-948291
         const orderId = `CZ-${crypto.randomInt(100000, 999999)}`;
@@ -109,229 +112,289 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
 //@desc Customer initiate dashboard overview.
 //initiatePayment - initialize Paystack transaction using locked order total.
 //@access Private (Customer only)
+// export const initiatePayment = async (req: AuthRequest, res: Response) => {
+//     try {
+//         const { orderId } = req.params;
+//         const userId = req.user?.userId;
+//         if (!userId) {
+//             res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
+//             return;
+//         }
+//         const user = await UserModel.findById(userId).select("email").lean();
+//         if (!user || !user.email) {
+//             return res.status(400).json({ success: false, message: "Valid user email not found" });
+//         }
+//
+//         const order = await Order.findOne({ orderId, userId });
+//         if (!order) {
+//             return res.status(404).json({ success: false, message: "Order not found" });
+//         }
+//         if (order.paymentStatus === "paid") return res.status(400).json({ success: false, message: "Order already paid" });
+//
+//         const reference = crypto.randomUUID();
+//
+//         // const response = await paystack.post("/transaction/initialize", {
+//         //     email: req.user?.email,
+//         //     amount: order.totalAmount * 100, // Paystack uses kobo
+//         //     reference: crypto.randomUUID(),
+//         //     callback_url: `${process.env.BASE_URL}/api/v1/orders/verify`,
+//         // });
+//
+//         const response = await withTimeout(paystack.post("/transaction/initialize", {
+//             email: user.email,
+//             amount: Math.round(order.totalAmount * 100), // kobo
+//             reference,
+//             callback_url: `${process.env.BASE_URL}/checkout/success` // frontend success page
+//         }), 10000);
+//
+//         order.transactionRef = response.data.data.reference || reference;
+//         await withTimeout(order.save(), 5000);
+//
+//         res.status(200).json({
+//             success: true,
+//             message: "Payment initialized successfully",
+//             authorizationUrl: response.data.data.authorization_url,
+//             reference: reference
+//         });
+//         return;
+//
+//     } catch (error) {
+//         console.error("Payment init Error:", error);
+//         res.status(500).json({ success: false, message: "Payment initialization failed" });
+//         return;
+//     }
+// };
+//@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
+//@desc Initiate Hubtel payment
+//Backend creates Hubtel checkout
+//Backend returns checkoutUrl
+//Frontend redirects customer
+//@access Private (Customer only)
 export const initiatePayment = async (req: AuthRequest, res: Response) => {
     try {
         const { orderId } = req.params;
         const userId = req.user?.userId;
         if (!userId) {
-            res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
-            return;
-        }
-        const user = await UserModel.findById(userId).select("email").lean();
-        if (!user || !user.email) {
-            return res.status(400).json({ success: false, message: "Valid user email not found" });
+            return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
         const order = await Order.findOne({ orderId, userId });
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
-        if (order.paymentStatus === "paid") return res.status(400).json({ success: false, message: "Order already paid" });
 
-        const reference = crypto.randomUUID();
+        if (order.paymentStatus === "paid") {
+            return res.status(400).json({ success: false, message: "Order already paid" });
+        }
 
-        // const response = await paystack.post("/transaction/initialize", {
-        //     email: req.user?.email,
-        //     amount: order.totalAmount * 100, // Paystack uses kobo
-        //     reference: crypto.randomUUID(),
-        //     callback_url: `${process.env.BASE_URL}/api/v1/orders/verify`,
-        // });
+        const payload = {
+            totalAmount: Number(order.totalAmount.toFixed(2)),
+            description: `Payment for order ${order.orderId}`,
+            callbackUrl: `${process.env.BASE_URL}/api/v1/webhooks/hubtel`,
+            returnUrl: `${process.env.FRONTEND_URL}/checkout/success`,
+            cancellationUrl: `${process.env.FRONTEND_URL}/checkout/cancel`,
+            merchantAccountNumber: process.env.HUBTEL_MERCHANT_ID,
+            clientReference: order.orderId,
+        };
 
-        const response = await withTimeout(paystack.post("/transaction/initialize", {
-            email: user.email,
-            amount: Math.round(order.totalAmount * 100), // kobo
-            reference,
-            callback_url: `${process.env.BASE_URL}/checkout/success` // frontend success page
-        }), 10000);
+        const response = await hubtel.post(
+            "/items/initiate",
+            payload
+        );
 
-        order.transactionRef = response.data.data.reference || reference;
-        await withTimeout(order.save(), 5000);
+        if (!response?.data?.data?.checkoutUrl) {
+            throw new Error("Invalid Hubtel response");
+        }
 
-        res.status(200).json({
+        //Hubtel Checkout URL
+        // order.transactionRef = response.data.data.clientReference;
+        order.transactionRef = order.orderId;
+        await order.save();
+
+        return res.status(200).json({
             success: true,
-            message: "Payment initialized successfully",
-            authorizationUrl: response.data.data.authorization_url,
-            reference: reference
+            message: "Hubtel payment initialized",
+            checkoutUrl: response.data.data.checkoutUrl,
         });
-        return;
 
     } catch (error) {
-        console.error("Payment init Error:", error);
-        res.status(500).json({ success: false, message: "Payment initialization failed" });
-        return;
+        console.error("Hubtel init error:", (error as any)?.response?.data || error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to initiate Hubtel payment",
+        });
     }
 };
+
 
 
 //@route GET /api/v1/store/customer/dashboard overview/verify?reference=xxx
 //desc Verify dashboard overview. User-return verify (frontend calls after redirect)
 //@access Private (Customer only)
-export const verifyPayment = async (req: AuthRequest, res: Response) => {
+// export const verifyPayment = async (req: AuthRequest, res: Response) => {
+//     try {
+//         const userId = req.user?.userId;
+//         if (!userId) {
+//             res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
+//             return;
+//         }
+//         const user = await UserModel.findById(userId).select("email fullName").lean();
+//         if (!user || !user.email) {
+//             return res.status(400).json({ success: false, message: "Valid user email not found" });
+//         }
+//
+//         const reference = String(req.query.reference || "");
+//         if (!reference) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invalid or missing dashboard overview reference",
+//             });
+//         }
+//
+//         //Verify from Paystack
+//         const response = await withTimeout(
+//             paystack.get(`/transaction/verify/${reference}`),
+//             10000
+//         );
+//
+//         const status = response.data.data.status;
+//
+//         if (status !== "success") {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Payment not successful",
+//                 raw: response.data,
+//             });
+//         }
+//
+//         //Update order
+//         const order = await Order.findOneAndUpdate(
+//             { transactionRef: reference },
+//             { paymentStatus: "paid" },
+//             { new: true }
+//         );
+//
+//         if (!order) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Order not found",
+//             });
+//         }
+//
+//         //Send email + SMS (non-blocking, safe)
+//         try {
+//             // EMAIL
+//             await sendEmail({
+//                 email: user.email,
+//                 subject: `Payment Successful - Order ${order.orderId}`,
+//                 text: `
+// Your payment was successful.
+//
+// Order ID: ${order.orderId}
+// Total Paid: GHS ${order.totalAmount}
+//
+// Thank you for ordering from Cozy Oven!
+//         `,
+//             });
+//
+//             //New Order Notification
+//             await createNotification({
+//                 title: "New Order Received",
+//                 message: `Order #${order.orderId} has been placed by ${user.fullName}`,
+//                 type: "order",
+//                 metadata: {
+//                     orderId: order._id
+//                 }
+//             });
+//
+//
+//             //SMS
+//             await sendSMS({
+//                 recipient: [order.contactNumber],
+//                 message: `Your Cozy Oven order  ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
+//             });
+//
+//         } catch (notifyErr) {
+//             console.warn("Notification (email/SMS) failed:", notifyErr);
+//         }
+//
+//         return res.status(200).json({
+//             success: true,
+//             message: "Payment verified successfully",
+//             order,
+//         });
+//
+//     } catch (error) {
+//         console.error("Payment Verify Error:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Verification failed",
+//         });
+//     }
+// };
+
+
+/**
+ * webhookHandler - Hubtel webhook listener
+ * Route: POST  /api/v1/webhooks/hubtel
+ */
+//@route POST /api/v1/webhooks/hubtel
+//@desc Hubtel webhook listener
+//@access Public (Hubtel Webhook)
+export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
     try {
-        const userId = req.user?.userId;
-        if (!userId) {
-            res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
-            return;
-        }
-        const user = await UserModel.findById(userId).select("email fullName").lean();
-        if (!user || !user.email) {
-            return res.status(400).json({ success: false, message: "Valid user email not found" });
+        const status = req.body?.Data?.Status;
+        const clientReference = req.body?.Data?.ClientReference;
+
+        if (status !== "Success" || !clientReference) {
+            return res.status(200).send("Ignored: Invalid status or clientReference");
         }
 
-        const reference = String(req.query.reference || "");
-        if (!reference) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid or missing dashboard overview reference",
-            });
-        }
-
-        //Verify from Paystack
-        const response = await withTimeout(
-            paystack.get(`/transaction/verify/${reference}`),
-            10000
-        );
-
-        const status = response.data.data.status;
-
-        if (status !== "success") {
-            return res.status(400).json({
-                success: false,
-                message: "Payment not successful",
-                raw: response.data,
-            });
-        }
-
-        //Update order
-        const order = await Order.findOneAndUpdate(
-            { transactionRef: reference },
-            { paymentStatus: "paid" },
-            { new: true }
-        );
-
+        const order = await Order.findOne({ orderId: clientReference });
         if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Order not found",
-            });
+            console.warn("Webhook order not found:", clientReference);
+            return res.status(200).send("OK");
         }
 
-        //Send email + SMS (non-blocking, safe)
-        try {
-            // EMAIL
-            await sendEmail({
-                email: user.email,
-                subject: `Payment Successful - Order ${order.orderId}`,
-                text: `
-Your payment was successful.
+        if (order.paymentStatus !== "paid") {
+            order.paymentStatus = "paid";
+            order.paidAt = new Date();
+            await order.save();
 
-Order ID: ${order.orderId}
-Total Paid: GHS ${order.totalAmount}
-
-Thank you for ordering from Cozy Oven!
-        `,
-            });
-
-            //New Order Notification
+            //Notifications (safe async)
             await createNotification({
-                title: "New Order Received",
-                message: `Order #${order.orderId} has been placed by ${user.fullName}`,
+                title: "Payment Successful",
+                message: `Order #${order.orderId} has been paid via Hubtel`,
                 type: "order",
-                metadata: {
-                    orderId: order._id
-                }
+                metadata: { orderId: order._id },
             });
-
 
             //SMS
             await sendSMS({
                 recipient: [order.contactNumber],
                 message: `Your Cozy Oven order  ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
             });
-
-        } catch (notifyErr) {
-            console.warn("Notification (email/SMS) failed:", notifyErr);
         }
 
-        return res.status(200).json({
-            success: true,
-            message: "Payment verified successfully",
-            order,
-        });
+        return res.status(200).send("Payment Successful");
 
-    } catch (error) {
-        console.error("Payment Verify Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Verification failed",
-        });
-    }
-};
-
-
-/**
- * webhookHandler - Paystack webhook listener
- * Route: POST /api/v1/webhooks/paystack
- * Validate signature using PAYSTACK_SECRET_KEY (webhook secret) or compare event
- */
-export const paystackWebhook = async (req: Request, res: Response) => {
-    try {
-        const signature = req.headers.get("x-paystack-signature") || "";
-        const payload = JSON.stringify(req.body);
-
-        // Validate HMAC SHA512 using your PAYSTACK_WEBHOOK_SECRET env var
-        const secret = process.env.PAYSTACK_WEBHOOK_SECRET || "";
-        const cryptoHmac = require("crypto").createHmac("sha512", secret).update(payload).digest("hex");
-        if (signature !== cryptoHmac) {
-            console.warn("Invalid paystack webhook signature");
-            return res.status(400).send("Invalid signature");
-        }
-
-        const event = await req.json() as { event: string; data: { reference: string; status: string; customer?: { email: string } } };
-        // sample: event.event = 'charge.success' or 'transaction.success' (Paystack has variants)
-        if (event?.event === "charge.success" || event?.event === "transaction.success") {
-            const ref = event.data.reference;
-            const status = event.data.status;
-
-            if (status === "success") {
-                const order = await Order.findOne({ transactionRef: ref });
-                if (!order) {
-                    // maybe log for manual reconciliation
-                    console.warn("Webhook: order not found for ref", ref);
-                    res.status(200).send("ok");
-                    return;
-                }
-
-                if (order.paymentStatus !== "paid") {
-                    order.paymentStatus = "paid";
-                    await order.save();
-
-                    // generate receipt async-safe flow (try/catch)
-                    try {
-                        // send email and sms
-                        await sendEmail({
-                            email: (order as any).userIdEmail || event.data.customer?.email,
-                            subject: `Receipt for ${order.orderId}`,
-                            text: `<p>Payment confirmed for ${order.orderId}.</p><p><a href="${order.receiptUrl}">Download receipt</a></p>`
-                        }).catch(err => console.warn("Email failed:", err));
-
-                        await sendSMS({
-                            recipient: [order.contactNumber],
-                            message: `Payment confirmed for order ${order.orderId}.`
-                        }).catch(err => console.warn("SMS failed:", err));
-                    } catch (err) {
-                        console.warn("Webhook post-dashboard overview tasks failed:", err);
-                    }
-                }
-            }
-        }
-
-        res.status(200).send("ok");
     } catch (err) {
-        console.error("Webhook handler error:", err);
-        res.status(500).send("error");
+        console.error("Hubtel webhook error:", err);
+        return res.status(200).send("error: An error occurred while processing the webhook");
     }
 };
+
+//CRON job
+//Outbound IPs whitelisted
+export const checkHubtelStatus = async (orderId: string) => {
+    const res = await hubtelStatusClient.get(
+        `/transactions/${process.env.HUBTEL_MERCHANT_ID}/status`,
+        { params: { clientReference: orderId } }
+    );
+
+    return res.data;
+};
+
 
 
 //@route GET /api/v1/store/customer/order-history
