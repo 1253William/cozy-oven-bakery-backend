@@ -2,9 +2,6 @@ import { Response } from "express";
 import { AuthRequest } from '../../types/authRequest'
 import Order from "./order.model";
 import ProductModel from "../products/product.model";
-import UserModel from "../account/user.model"
-import redisClient from "../../config/redis";
-import paystack from "../../config/paystack";
 import hubtel from "../../config/hubtel";
 import { sendEmail } from '../../utils/email.transporter';
 import { sendSMS } from "../../utils/sendSMS";
@@ -18,9 +15,9 @@ import crypto from "crypto";
 
 
 //@route POST /api/v1/store/customer/orders/checkout
-//@desc Customer place order and check out.  Checkout: create order and lock totals.
-//Frontend sends items + totals. Backend verifies product prices for a subset or all items,
-//recomputes totals server-side and rejects if mismatch.
+//@desc Customer places order and check out.  Checkout: create order and lock totals.
+//Frontend sends items and totals. Backend verifies product prices for a subset or all items,
+//recomputes totals server-side and rejects if mismatched.
 //@access Private (Customer only)
 export const checkOut = async (req: AuthRequest, res: Response) => {
     try {
@@ -109,62 +106,6 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
 
 
 //@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
-//@desc Customer initiate dashboard overview.
-//initiatePayment - initialize Paystack transaction using locked order total.
-//@access Private (Customer only)
-// export const initiatePayment = async (req: AuthRequest, res: Response) => {
-//     try {
-//         const { orderId } = req.params;
-//         const userId = req.user?.userId;
-//         if (!userId) {
-//             res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
-//             return;
-//         }
-//         const user = await UserModel.findById(userId).select("email").lean();
-//         if (!user || !user.email) {
-//             return res.status(400).json({ success: false, message: "Valid user email not found" });
-//         }
-//
-//         const order = await Order.findOne({ orderId, userId });
-//         if (!order) {
-//             return res.status(404).json({ success: false, message: "Order not found" });
-//         }
-//         if (order.paymentStatus === "paid") return res.status(400).json({ success: false, message: "Order already paid" });
-//
-//         const reference = crypto.randomUUID();
-//
-//         // const response = await paystack.post("/transaction/initialize", {
-//         //     email: req.user?.email,
-//         //     amount: order.totalAmount * 100, // Paystack uses kobo
-//         //     reference: crypto.randomUUID(),
-//         //     callback_url: `${process.env.BASE_URL}/api/v1/orders/verify`,
-//         // });
-//
-//         const response = await withTimeout(paystack.post("/transaction/initialize", {
-//             email: user.email,
-//             amount: Math.round(order.totalAmount * 100), // kobo
-//             reference,
-//             callback_url: `${process.env.BASE_URL}/checkout/success` // frontend success page
-//         }), 10000);
-//
-//         order.transactionRef = response.data.data.reference || reference;
-//         await withTimeout(order.save(), 5000);
-//
-//         res.status(200).json({
-//             success: true,
-//             message: "Payment initialized successfully",
-//             authorizationUrl: response.data.data.authorization_url,
-//             reference: reference
-//         });
-//         return;
-//
-//     } catch (error) {
-//         console.error("Payment init Error:", error);
-//         res.status(500).json({ success: false, message: "Payment initialization failed" });
-//         return;
-//     }
-// };
-//@route POST /api/v1/store/customer/orders/:orderId/initiate-payment
 //@desc Initiate Hubtel payment
 //Backend creates Hubtel checkout
 //Backend returns checkoutUrl
@@ -177,8 +118,6 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
-        const userEmail = await UserModel.findById(userId).select("email").lean();
-
         const order = await Order.findOne({ orderId, userId });
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
@@ -196,7 +135,6 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
             cancellationUrl: `${process.env.FRONTEND_URL}/checkout/cancel`,
             merchantAccountNumber: process.env.HUBTEL_MERCHANT_ID,
             clientReference: order.orderId,
-            payeeEmail: userEmail
         };
 
         const response = await hubtel.post(
@@ -209,7 +147,6 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
         }
 
         //Hubtel Checkout URL
-        // order.transactionRef = response.data.data.clientReference;
         order.transactionRef = order.orderId;
         await order.save();
 
@@ -230,112 +167,6 @@ export const initiatePayment = async (req: AuthRequest, res: Response) => {
 
 
 
-//@route GET /api/v1/store/customer/dashboard overview/verify?reference=xxx
-//desc Verify dashboard overview. User-return verify (frontend calls after redirect)
-//@access Private (Customer only)
-// export const verifyPayment = async (req: AuthRequest, res: Response) => {
-//     try {
-//         const userId = req.user?.userId;
-//         if (!userId) {
-//             res.status(401).json({ success: false, message: "Unauthorized: Authentication required" });
-//             return;
-//         }
-//         const user = await UserModel.findById(userId).select("email fullName").lean();
-//         if (!user || !user.email) {
-//             return res.status(400).json({ success: false, message: "Valid user email not found" });
-//         }
-//
-//         const reference = String(req.query.reference || "");
-//         if (!reference) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Invalid or missing dashboard overview reference",
-//             });
-//         }
-//
-//         //Verify from Paystack
-//         const response = await withTimeout(
-//             paystack.get(`/transaction/verify/${reference}`),
-//             10000
-//         );
-//
-//         const status = response.data.data.status;
-//
-//         if (status !== "success") {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Payment not successful",
-//                 raw: response.data,
-//             });
-//         }
-//
-//         //Update order
-//         const order = await Order.findOneAndUpdate(
-//             { transactionRef: reference },
-//             { paymentStatus: "paid" },
-//             { new: true }
-//         );
-//
-//         if (!order) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Order not found",
-//             });
-//         }
-//
-//         //Send email + SMS (non-blocking, safe)
-//         try {
-//             // EMAIL
-//             await sendEmail({
-//                 email: user.email,
-//                 subject: `Payment Successful - Order ${order.orderId}`,
-//                 text: `
-// Your payment was successful.
-//
-// Order ID: ${order.orderId}
-// Total Paid: GHS ${order.totalAmount}
-//
-// Thank you for ordering from Cozy Oven!
-//         `,
-//             });
-//
-//             //New Order Notification
-//             await createNotification({
-//                 title: "New Order Received",
-//                 message: `Order #${order.orderId} has been placed by ${user.fullName}`,
-//                 type: "order",
-//                 metadata: {
-//                     orderId: order._id
-//                 }
-//             });
-//
-//
-//             //SMS
-//             await sendSMS({
-//                 recipient: [order.contactNumber],
-//                 message: `Your Cozy Oven order  ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
-//             });
-//
-//         } catch (notifyErr) {
-//             console.warn("Notification (email/SMS) failed:", notifyErr);
-//         }
-//
-//         return res.status(200).json({
-//             success: true,
-//             message: "Payment verified successfully",
-//             order,
-//         });
-//
-//     } catch (error) {
-//         console.error("Payment Verify Error:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "Verification failed",
-//         });
-//     }
-// };
-
-
 /**
  * webhookHandler - Hubtel webhook listener
  * Route: POST  /api/v1/webhooks/hubtel
@@ -347,30 +178,31 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
     try {
         const status = req.body?.Data?.Status;
         const clientReference = req.body?.Data?.ClientReference;
-        const payee = req.body?.Data?.PayeeEmail;
 
         if (status !== "Success" || !clientReference) {
             return res.status(200).send("Ignored: Invalid status or clientReference");
         }
 
-        if(!payee) {
-            return res.status(200).send("Ignored: Invalid payee");
-        }
-
-        const order = await Order.findOne({ orderId: clientReference });
+        const order = await Order.findOne({ orderId: clientReference })
+            .populate("userId","email")
         if (!order) {
             console.warn("Webhook order not found:", clientReference);
             return res.status(200).send("OK");
         }
 
-        if (!order || order.paymentStatus !== "paid") {
+        const userEmail = (order.userId as {email?:string})?.email;
+        if (!userEmail) {
+            return res.status(200).send("Ignored: User email not found");
+        }
+
+        if (order.paymentStatus !== "paid") {
             order.paymentStatus = "paid";
             order.paidAt = new Date();
             await order.save();
 
             //EMAIL
             await sendEmail({
-                email: payee,
+                email: userEmail,
                 subject: `Payment Successful - Order ${order.orderId}`,
                 text: `
 Your payment was successful.
@@ -447,7 +279,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
 
         const query = { userId, ...statusFilter };
 
-        // Fetch orders + total count
+        // Fetch orders plus total count
         const [orders, totalOrders] = await Promise.all([
             Order.find(query)
                 .sort({ createdAt: -1 })
