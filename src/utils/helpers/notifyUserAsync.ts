@@ -9,11 +9,11 @@ interface Order {
 
 export const notifyUserAsync = async (order: Order, user: { name?: string; email: string }, newStatus: 'pending' | 'preparing' | 'on-delivery' | 'delivered' | 'cancelled') => {
     const statusMessages: Record<'pending' | 'preparing' | 'on-delivery' | 'delivered' | 'cancelled', string> = {
-        pending: `Your order ${order.orderId} is now pending.`,
-        preparing: `Your order ${order.orderId} is being prepared.`,
+        pending: `Your Cozy Oven order ${order.orderId} is now pending.`,
+        preparing: `Your Cozy Oven order ${order.orderId} is being prepared.`,
         "on-delivery": `Your order ${order.orderId} is out for delivery.`,
-        delivered: `Your order ${order.orderId} has been delivered. Thank you!`,
-        cancelled: `Your order ${order.orderId} has been cancelled.`,
+        delivered: `Your Cozy Oven order ${order.orderId} has been delivered. Thank you for shopping with us!`,
+        cancelled: `Your Cozy Oven order ${order.orderId} has been cancelled.`,
     };
 
     const emailMessage = `
