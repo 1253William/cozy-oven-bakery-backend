@@ -334,12 +334,17 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
 //@access Private (Admin only)
 export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 10;
+        const page = Number(req.query.page as string) || 1;
+        const limit = Number(req.query.limit as string) || 10;
         const skip = (page - 1) * limit;
 
+        //Filter for only Paid orders
+        const filter = { paymentStatus: "paid" };
+
+
         // --- ORDER STATISTICS ---
-        const orderStats = await Order.aggregate([
+        const [orderStats] = await Order.aggregate([
+            { $match: filter },
             {
                 $group: {
                     _id: null,
@@ -354,8 +359,8 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
         ]);
 
         // --- FETCH PAGINATED ORDERS ---
-        const rawOrders = await Order.find()
-            .populate<{ userId: { fullName?: string; email?: string } }>({ path: "userId", select: "fullName email" })
+        const rawOrders = await Order.find(filter)
+            .populate<{ userId: { fullName?: string; email?: string; paidAt?:Date; } }>({ path: "userId", select: "fullName email" })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
@@ -367,15 +372,18 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
             customer: (order.userId as { fullName?: string })?.fullName || "Unknown",
             email: (order.userId as { email?: string })?.email || "Unknown",
             items: `${order.items.length} items`,
-            total: `GHS ${order.totalAmount.toFixed(2)}`,
+            amount: `GHS ${order.totalAmount.toFixed(2)}`,
             status: order.orderStatus,
+            paymentStatus: order.paymentStatus,
+            paidAt: order.paidAt?.toLocaleDateString("en-GB"),
             date: new Date(order.createdAt).toLocaleDateString("en-GB"), // DD/MM/YYYY
         }));
 
-        const totalOrders = await Order.countDocuments();
+        const totalOrders = await Order.countDocuments(filter);
 
         res.status(200).json({
             success: true,
+            message: "All Orders fetched successfully",
             data: {
                 orders,
                 pagination: {
@@ -411,6 +419,83 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
         res.status(500).json({
             success: false,
             message: "Internal Server Error: Failed to fetch all orders"
+        });
+        return;
+    }
+};
+
+
+//@route GET /api/v1/dashboard/admin/orders/:orderId
+//@desc Fetch a specific PAID order with full item details for admin modal
+//@access Private (Admin only)
+export const getOrderByOrderId = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { orderId } = req.params;
+
+        const order = await Order.findOne({
+            orderId,
+            paymentStatus: "paid"
+        })
+            .populate<{ userId: { fullName?: string; email?: string } }>({
+                path: "userId",
+                select: "fullName email"
+            })
+            .lean();
+
+        if (!order) {
+            res.status(404).json({
+                success: false,
+                message: "Paid order not found"
+            });
+            return;
+        }
+
+        // ==============================
+        // FORMAT FOR ADMIN MODAL
+        // ==============================
+        const response = {
+            orderId: order.orderId,
+            customer: {
+                name: order.userId?.fullName || "Unknown",
+                email: order.userId?.email || "Unknown",
+                contactNumber: order.contactNumber,
+                deliveryAddress: order.deliveryAddress
+            },
+            items: order.items.map(item => ({
+                productId: item.productId,
+                name: item.name,
+                thumbnail: item.thumbnail,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                total: item.total
+            })),
+            pricing: {
+                subtotal: order.subtotal,
+                deliveryFee: order.deliveryFee,
+                totalAmount: order.totalAmount
+            },
+            payment: {
+                status: order.paymentStatus,
+                method: order.paymentMethod,
+                transactionRef: order.transactionRef,
+                paidAt: order.paidAt
+            },
+            orderStatus: order.orderStatus,
+            createdAt: order.createdAt
+        };
+
+        res.status(200).json({
+            success: true,
+            message: "Order fetched successfully",
+            data: response
+        });
+        return;
+
+    } catch (error) {
+        console.error("GetAdminOrderByOrderId error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch order details"
         });
         return;
     }

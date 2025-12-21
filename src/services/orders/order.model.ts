@@ -73,7 +73,7 @@ const OrderSchema = new Schema<IOrder>(
         paymentMethod: {
             type: String,
             enum: ["paystack", "hubtel", "cash-on-delivery"],
-            default: "paystack",
+            default: "hubtel",
         },
         transactionRef: { type: String },
         receiptUrl: { type: String },

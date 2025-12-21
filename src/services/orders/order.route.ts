@@ -10,6 +10,7 @@ import {
     getAllOrdersAdmin,
     updateOrderStatus,
     deleteOrder,
+    getOrderByOrderId,
 } from "./order.controller";
 
 const router = express.Router();
@@ -150,7 +151,7 @@ router.get("/store/customer/orders/:orderId/receipt", authMiddleware, authorized
  * /api/v1/dashboard/admin/orders:
  *   get:
  *     summary: Fetch all orders (Admin)
- *     description: Fetches all customer orders with pagination and statistics.
+ *     description: Fetches all paid customer orders with pagination and statistics.
  *     tags:
  *       - Orders (Admin)
  *     security:
@@ -178,6 +179,172 @@ router.get("/store/customer/orders/:orderId/receipt", authMiddleware, authorized
 //@desc Fetch customer orders to admin dashboard with pagination and statistics
 //@access Private (Admin only)
 router.get("/dashboard/admin/orders", authMiddleware, authorizedRoles("Admin"), getAllOrdersAdmin);
+
+
+/**
+ * @swagger
+ * /api/v1/dashboard/admin/orders/{orderId}:
+ *   get:
+ *     tags:
+ *       - Orders (Admin)
+ *     summary: Fetch a specific paid order for admin review
+ *     description: >
+ *       Allows an admin to retrieve a **single customer order that has been successfully paid for**.
+ *       This endpoint is typically used to populate an admin modal where order items, customer details,
+ *       payment information, and delivery data are displayed so the admin can proceed with order preparation.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "CZ-441564"
+ *         description: Unique order identifier generated at checkout.
+ *     responses:
+ *       200:
+ *         description: Paid order retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     orderId:
+ *                       type: string
+ *                       example: "CZ-441564"
+ *                     customer:
+ *                       type: object
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                           example: "John Doe"
+ *                         email:
+ *                           type: string
+ *                           example: "john@example.com"
+ *                         contactNumber:
+ *                           type: string
+ *                           example: "0241234567"
+ *                         deliveryAddress:
+ *                           type: string
+ *                           example: "East Legon, Accra"
+ *                     items:
+ *                       type: array
+ *                       description: List of items purchased by the customer.
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           productId:
+ *                             type: string
+ *                             example: "64f2a7d91a2e9c8c12345678"
+ *                           name:
+ *                             type: string
+ *                             example: "Chicken Pizza"
+ *                           thumbnail:
+ *                             type: string
+ *                             example: "https://cdn.example.com/products/bread.jpg"
+ *                           unitPrice:
+ *                             type: number
+ *                             example: 45
+ *                           quantity:
+ *                             type: number
+ *                             example: 2
+ *                           total:
+ *                             type: number
+ *                             example: 90
+ *                     pricing:
+ *                       type: object
+ *                       properties:
+ *                         subtotal:
+ *                           type: number
+ *                           example: 90
+ *                         deliveryFee:
+ *                           type: number
+ *                           example: 10
+ *                         totalAmount:
+ *                           type: number
+ *                           example: 100
+ *                     payment:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           enum: [paid]
+ *                           example: "paid"
+ *                         method:
+ *                           type: string
+ *                           enum: [ hubtel, cash-on-delivery]
+ *                           example: "hubtel"
+ *                         transactionRef:
+ *                           type: string
+ *                           example: "HTL-99383939"
+ *                         paidAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2025-12-18T03:25:40.000Z"
+ *                     orderStatus:
+ *                       type: string
+ *                       enum:
+ *                         - pending
+ *                         - preparing
+ *                         - on-delivery
+ *                         - delivered
+ *                         - cancelled
+ *                       example: "pending"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2025-12-18T03:22:10.000Z"
+ *       401:
+ *         description: Unauthorized or invalid admin token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Unauthorized access"
+ *       404:
+ *         description: Paid order not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Paid order not found"
+ *       500:
+ *         description: Internal server error while fetching order details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Failed to fetch order details"
+ */
+//@route GET /api/v1/dashboard/admin/orders/:orderId
+//@desc View Order details
+//@access Private (Admin only)
+router.get("/dashboard/admin/orders/:orderId", authMiddleware, authorizedRoles("Admin"), getOrderByOrderId);
 
 /**
  * @swagger
