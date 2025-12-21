@@ -338,13 +338,7 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
         const limit = Number(req.query.limit as string) || 10;
         const skip = (page - 1) * limit;
 
-        //Filter for only Paid orders
-        const filter = { paymentStatus: "paid" };
-
-
-        // --- ORDER STATISTICS ---
-        const [orderStats] = await Order.aggregate([
-            { $match: filter },
+        const [globalStats] = await Order.aggregate([
             {
                 $group: {
                     _id: null,
@@ -353,13 +347,26 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
                     preparing: { $sum: { $cond: [{ $eq: ["$orderStatus", "preparing"] }, 1, 0] } },
                     delivered: { $sum: { $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0] } },
                     cancelled: { $sum: { $cond: [{ $eq: ["$orderStatus", "cancelled"] }, 1, 0] } },
-                    totalRevenue: { $sum: "$totalAmount" }
+
+                    //Revenue ONLY from paid orders
+                    totalRevenue: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ["$paymentStatus", "paid"] },
+                                "$totalAmount",
+                                0
+                            ]
+                        }
+                    }
                 }
             }
         ]);
 
+        //Filter for only Paid orders
+        const paidFilter = { paymentStatus: "paid" };
+
         // --- FETCH PAGINATED ORDERS ---
-        const rawOrders = await Order.find(filter)
+        const rawOrders = await Order.find(paidFilter)
             .populate<{ userId: { fullName?: string; email?: string; paidAt?:Date; } }>({ path: "userId", select: "fullName email" })
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -379,7 +386,7 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
             date: new Date(order.createdAt).toLocaleDateString("en-GB"), // DD/MM/YYYY
         }));
 
-        const totalOrders = await Order.countDocuments(filter);
+        const totalPaidOrders = await Order.countDocuments(paidFilter);
 
         res.status(200).json({
             success: true,
@@ -388,29 +395,19 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
                 orders,
                 pagination: {
                     currentPage: page,
-                    totalPages: Math.ceil(totalOrders / limit),
-                    totalOrders,
-                    hasNext: skip + limit < totalOrders,
+                    totalPages: Math.ceil(totalPaidOrders / limit),
+                    totalPaidOrders,
+                    hasNext: skip + limit < totalPaidOrders,
                     hasPrev: page > 1
                 },
-                statistics:
-                    orderStats.length > 0
-                        ? {
-                            totalOrders: orderStats[0].totalOrders,
-                            pending: orderStats[0].pending,
-                            preparing: orderStats[0].preparing,
-                            delivered: orderStats[0].delivered,
-                            cancelled: orderStats[0].cancelled,
-                            totalRevenue: orderStats[0].totalRevenue
-                        }
-                        : {
-                            totalOrders: 0,
-                            pending: 0,
-                            preparing: 0,
-                            delivered: 0,
-                            cancelled: 0,
-                            totalRevenue: 0
-                        }
+                statistics: {
+                    totalOrders: globalStats?.totalOrders || 0,
+                    pending: globalStats?.pending || 0,
+                    preparing: globalStats?.preparing || 0,
+                    delivered: globalStats?.delivered || 0,
+                    cancelled: globalStats?.cancelled || 0,
+                    totalRevenue: globalStats?.totalRevenue || 0
+                }
             }
         });
 
