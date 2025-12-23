@@ -14,7 +14,7 @@ export interface IOrder extends Document {
     orderId: string;        // CozyOven-6digit or UUID
     items: IOrderItem[];
     subtotal: number;
-    deliveryFee: number;
+    deliveryFee?: number;
     totalAmount: number;
     paymentStatus: "pending" | "paid" | "failed" | "refunded";
     paidAt?: Date;
@@ -25,8 +25,10 @@ export interface IOrder extends Document {
         | "delivered"
         | "cancelled";
     deliveryAddress: string;
+    city: string,
+    specialInstructions?: string,
     contactNumber: string;
-    paymentMethod: "paystack" | "hubtel" | "cash-on-delivery";
+    paymentMethod: "hubtel" | "cash-on-delivery";
     transactionRef?: string; //paystack reference
     receiptUrl?: string; //uploaded pdf url
     metadata?:Record<string, any>; //optional analytics
@@ -69,10 +71,12 @@ const OrderSchema = new Schema<IOrder>(
             default: "pending",
         },
         deliveryAddress: { type: String, required: true },
+        city: { type: String, required: true },
+        specialInstructions: { type: String },
         contactNumber: { type: String, required: true },
         paymentMethod: {
             type: String,
-            enum: ["paystack", "hubtel", "cash-on-delivery"],
+            enum: ["hubtel", "cash-on-delivery"],
             default: "hubtel",
         },
         transactionRef: { type: String },

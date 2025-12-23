@@ -27,7 +27,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
             return;
         }
 
-        const { items, deliveryFee, deliveryAddress, contactNumber, paymentMethod = 'paystack' } = req.body;
+        const { items, deliveryFee, deliveryAddress, city, contactNumber, paymentMethod = 'hubtel', specialInstructions, } = req.body;
         if (!items || !Array.isArray(items) || items.length === 0) {
             res.status(400).json({ success: false, message: "Order items are required" });
             return;
@@ -84,6 +84,8 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
             paymentMethod,
             contactNumber,
             deliveryAddress,
+            city,
+            specialInstructions,
             paymentStatus: paymentMethod === "cash-on-delivery" ? "pending" : "pending"
         }), 8000);
 
@@ -302,6 +304,9 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
                 year: "numeric",
             }),
             price: order.totalAmount,
+            deliveryAddress: order.deliveryAddress,
+            city: order.city,
+            specialInstructions: order.specialInstructions,
             status: order.orderStatus,
         }));
 
@@ -456,7 +461,9 @@ export const getOrderByOrderId = async (req: AuthRequest, res: Response): Promis
                 name: order.userId?.fullName || "Unknown",
                 email: order.userId?.email || "Unknown",
                 contactNumber: order.contactNumber,
-                deliveryAddress: order.deliveryAddress
+                deliveryAddress: order.deliveryAddress,
+                city: order.city,
+                specialInstructions: order.specialInstructions
             },
             items: order.items.map(item => ({
                 productId: item.productId,
