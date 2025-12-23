@@ -8,7 +8,7 @@ import settingsRouter from "../services/account/profile.route";
 import dashboardRouter from "../services/dashboard overview/overview.route";
 import customerRouter from "../services/customers/customers.route";
 import reportRouter from "../services/reports/reports.route";
-// import searchRouter from "../services/globals/search.routes";
+import searchRouter from "../services/globals/search.route";
 import inventoryRouter from "../services/inventory/inventory.route";
 import notificationRouter from "../services/notifications/notification.route";
 
@@ -37,7 +37,7 @@ rootRouter.use('/dashboard',dashboardRouter, inventoryRouter, reportRouter);
 rootRouter.use('/dashboard', customerRouter);
 
 //Search routes
-// rootRouter.use('/search', searchRouter);
+rootRouter.use('/search', searchRouter);
 
 //Notification routes
 rootRouter.use('/dashboard', notificationRouter);
