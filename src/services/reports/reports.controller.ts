@@ -18,51 +18,111 @@ export const monthlyFinanceSummary = async (req: AuthRequest, res: Response) => 
     try {
         const { month, year } = req.query;
 
+        // -------------------------------
+        // 1. Validate input
+        // -------------------------------
         if (!month || !year) {
-            res.status(400).json({
+            return res.status(400).json({
                 success: false,
-                message: "Month and year are required"
+                message: "Month and year are required",
             });
-            return;
         }
 
-        //Inventory expenses
-        const expenses = await InventoryModel.aggregate([
-            { $match: { inventoryMonth: month, inventoryYear: year } },
-            { $group: { _id: null, totalExpenses: { $sum: "$totalCost" } } },
+        // Convert "December" + "2025" → Date range
+        const monthIndex = new Date(`${month} 1, ${year}`).getMonth();
+
+        if (isNaN(monthIndex)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid month provided",
+            });
+        }
+
+        const startDate = new Date(Number(year), monthIndex, 1);
+        const endDate = new Date(Number(year), monthIndex + 1, 1);
+
+        // -------------------------------
+        // 2. Inventory Expenses
+        // -------------------------------
+        const expensesAgg = await InventoryModel.aggregate([
+            {
+                $match: {
+                    inventoryMonth: month,
+                    inventoryYear: year,
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalExpenses: { $sum: "$totalCost" },
+                },
+            },
         ]);
 
-        //Sales revenue
-        const revenue = await Order.aggregate([
+        const totalExpenses = expensesAgg[0]?.totalExpenses || 0;
+
+        // -------------------------------
+        // 3. Revenue (PAID ORDERS ONLY)
+        // -------------------------------
+        const revenueAgg = await Order.aggregate([
             {
                 $match: {
                     paymentStatus: "paid",
-                    orderMonth: month,
-                    orderYear: year,
+                    paidAt: {
+                        $gte: startDate,
+                        $lt: endDate,
+                    },
                 },
             },
-            { $group: { _id: null, totalSales: { $sum: "$totalAmount" } } },
+            {
+                $group: {
+                    _id: null,
+                    totalSales: { $sum: "$totalAmount" },
+                },
+            },
         ]);
 
-        const totalExpenses = expenses[0]?.totalExpenses || 0;
-        const totalSales = revenue[0]?.totalSales || 0;
+        const totalRevenue = revenueAgg[0]?.totalSales || 0;
 
-        const profit = totalSales - totalExpenses;
-        const profitMargin = totalSales
-            ? ((profit / totalSales) * 100).toFixed(2)
-            : 0;
+        // -------------------------------
+        // 4. Profit & Margin
+        // -------------------------------
+        const profit = totalRevenue - totalExpenses;
 
+        // const profitMargin =
+        //     totalRevenue > 0
+        //         ? Number(((profit / totalRevenue) * 100).toFixed(2))
+        //         : 0;
+
+        let profitMarginExplanation = null;
+        let lossPerCedi = '0';
+        if (totalRevenue > 0) {
+            lossPerCedi = Math.abs(profit / totalRevenue).toFixed(2);
+
+            profitMarginExplanation =
+                profit < 0
+                    ? `For every GHS 1 earned, the business lost approximately GHS ${lossPerCedi}.`
+                    : `For every GHS 1 earned, the business made approximately GHS ${lossPerCedi}.`;
+        }
+
+        // -------------------------------
+        // 5. Save / Update Report
+        // -------------------------------
         const report = await Report.findOneAndUpdate(
             { month, year },
             {
                 month,
                 year,
-                totalRevenue: totalSales,
+                totalRevenue,
                 totalExpenses,
                 profit,
-                profitMargin
+                profitMargin: lossPerCedi,
+                profitMarginExplanation,
             },
-            { new: true, upsert: true }
+            {
+                new: true,
+                upsert: true,
+            }
         );
 
         res.status(200).json({

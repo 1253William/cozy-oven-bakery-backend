@@ -100,7 +100,7 @@ OrderSchema.pre("validate", function (next) {
 //INDEXES for super-fast queries
 OrderSchema.index({ userId: 1, createdAt: -1 });
 OrderSchema.index({ orderId: 1 });
-OrderSchema.index({ paymentStatus: 1 });
+OrderSchema.index({ paymentStatus: 1, paidAt: 1 });
 OrderSchema.index({ orderStatus: 1 });
 OrderSchema.index({ transactionRef: 1 });
 

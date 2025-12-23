@@ -3,11 +3,11 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IReport extends Document {
     month: string;
     year: string;
-
     totalRevenue: number;
     totalExpenses: number;
     profit: number;
     profitMargin: number;
+    profitMarginExplanation: string;
 
     createdAt: Date;
 }
@@ -20,7 +20,8 @@ const ReportSchema = new Schema<IReport>(
         totalRevenue: Number,
         totalExpenses: Number,
         profit: Number,
-        profitMargin: Number
+        profitMargin: Number,
+        profitMarginExplanation: String
     },
     { timestamps: true }
 );
