@@ -27,7 +27,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
             return;
         }
 
-        const { items, deliveryFee, deliveryAddress, city, contactNumber, paymentMethod = 'hubtel', specialInstructions, } = req.body;
+        const { items, orderDetails, deliveryFee, deliveryAddress, city, contactNumber, paymentMethod = 'hubtel', specialInstructions, } = req.body;
         if (!items || !Array.isArray(items) || items.length === 0) {
             res.status(400).json({ success: false, message: "Order items are required" });
             return;
@@ -78,6 +78,7 @@ export const checkOut = async (req: AuthRequest, res: Response) => {
             userId,
             orderId,
             items: enrichedItems,
+            orderDetails,
             subtotal,
             deliveryFee,
             totalAmount,
@@ -261,7 +262,7 @@ Thank you for ordering from Cozy Oven!
         if (ADMIN_NUMBERS.length > 0) {
             sendSMS({
                 recipient: ADMIN_NUMBERS,
-                message: `New paid order received: ${order.orderId}. Please log in to the dashboard to begin processing.`,
+                message: `Hello Admin! New paid order received: ${order.orderId}. Please log in to the dashboard to begin processing.`,
             }).catch(err =>
                 console.error("Admin SMS failed:", err)
             );
@@ -358,7 +359,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
-                .select("orderId items totalAmount orderStatus createdAt")
+                .select("orderId items totalAmount orderStatus createdAt orderDetails.pickUpDetails.specialInstructions deliveryAddress city")
                 .lean(),
 
             Order.countDocuments(query),
@@ -377,7 +378,7 @@ export const getMyOrders = async (req: AuthRequest, res: Response): Promise<void
             price: order.totalAmount,
             deliveryAddress: order.deliveryAddress,
             city: order.city,
-            specialInstructions: order.specialInstructions,
+            specialInstructions: order.orderDetails?.pickUpDetails?.specialInstructions,
             status: order.orderStatus,
         }));
 
@@ -534,7 +535,7 @@ export const getOrderByOrderId = async (req: AuthRequest, res: Response): Promis
                 contactNumber: order.contactNumber,
                 deliveryAddress: order.deliveryAddress,
                 city: order.city,
-                specialInstructions: order.specialInstructions
+                specialInstructions: order.orderDetails?.pickUpDetails?.specialInstructions
             },
             items: order.items.map(item => ({
                 productId: item.productId,

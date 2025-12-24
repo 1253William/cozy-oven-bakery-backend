@@ -9,10 +9,19 @@ export interface IOrderItem {
     total: number;         // unitPrice * quantity
 }
 
+export interface IOrderDetails {
+    orderItems: string[];
+    pickUpDetails?: {
+        pickupDate: string;
+        specialInstructions?: string,
+    }
+}
+
 export interface IOrder extends Document {
     userId: mongoose.Types.ObjectId;
     orderId: string;        // CozyOven-6digit or UUID
     items: IOrderItem[];
+    orderDetails?: IOrderDetails;
     subtotal: number;
     deliveryFee?: number;
     totalAmount: number;
@@ -24,9 +33,8 @@ export interface IOrder extends Document {
         | "on-delivery"
         | "delivered"
         | "cancelled";
-    deliveryAddress: string;
+    deliveryAddress?: string;
     city?: string,
-    specialInstructions?: string,
     contactNumber: string;
     paymentMethod: "hubtel" | "cash-on-delivery";
     transactionRef?: string; //paystack reference
@@ -45,11 +53,19 @@ const OrderItemSchema = new Schema<IOrderItem>({
     total: { type: Number, required: true, min: 0 }
 }, { _id: false });
 
+
 const OrderSchema = new Schema<IOrder>(
     {
         userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
         orderId: { type: String, required: true },
         items: { type: [OrderItemSchema], required: true },
+        orderDetails: {
+            orderItems: [{ type: String }],
+            pickUpDetails: {
+                pickupDate: { type: String },
+                specialInstructions: { type: String }
+            }
+        },
         subtotal: { type: Number, required: true },
         deliveryFee: { type: Number, default: 0 },
         totalAmount: { type: Number, required: true },
@@ -72,7 +88,6 @@ const OrderSchema = new Schema<IOrder>(
         },
         deliveryAddress: { type: String, required: true },
         city: { type: String },
-        specialInstructions: { type: String },
         contactNumber: { type: String, required: true },
         paymentMethod: {
             type: String,
@@ -80,7 +95,7 @@ const OrderSchema = new Schema<IOrder>(
             default: "hubtel",
         },
         transactionRef: { type: String },
-        receiptUrl: { type: String },
+        // receiptUrl: { type: String },
         metadata: { type: Schema.Types.Mixed, default: {} }
     },
     { timestamps: true }
