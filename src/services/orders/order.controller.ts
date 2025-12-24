@@ -180,9 +180,10 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
     try {
         const status = req.body?.Data?.Status;
         const clientReference = req.body?.Data?.ClientReference;
+        const TransactionId = req.body?.Data?.TransactionId;
 
         if (status !== "Success" || !clientReference) {
-            return res.status(200).send("Ignored: Invalid status or clientReference");
+            return res.status(200).send("Ignored: Payment not successful");
         }
 
         const order = await Order.findOne({ orderId: clientReference })
@@ -192,18 +193,29 @@ export const hubtelWebhook = async (req: AuthRequest, res: Response) => {
             return res.status(200).send("OK");
         }
 
-        const userEmail = (order.userId as {email?:string})?.email;
+        //Idempotency check
+        if (order.paymentStatus === "paid") {
+            return res.status(200).send("OK: Already processed");
+        }
+
+        // const userEmail = (order.userId as {email?:string})?.email;
+        // if (!userEmail) {
+        //     return res.status(200).send("Ignored: User email not found");
+        // }
+
+            order.paymentStatus = "paid";
+            order.paidAt = new Date();
+            order.transactionRef = TransactionId;
+            await order.save();
+
+        const userEmail = (order.userId as { email?: string })?.email;
         if (!userEmail) {
             return res.status(200).send("Ignored: User email not found");
         }
 
-        if (order.paymentStatus !== "paid") {
-            order.paymentStatus = "paid";
-            order.paidAt = new Date();
-            await order.save();
-
-            //EMAIL
-            await sendEmail({
+        // Email
+        if (userEmail) {
+            sendEmail({
                 email: userEmail,
                 subject: `Payment Successful - Order ${order.orderId}`,
                 text: `
@@ -214,25 +226,84 @@ Total Paid: GHS ${order.totalAmount}
 
 Thank you for ordering from Cozy Oven!
 
-©Cozy Oven Store. All rights reserved
-        `,
-            });
-
-
-            //Notifications (safe async)
-            await createNotification({
-                title: "Payment Successful",
-                message: `Order #${order.orderId} has been paid via Hubtel`,
-                type: "order",
-                metadata: { orderId: order._id },
-            });
-
-            //SMS
-            await sendSMS({
-                recipient: [order.contactNumber],
-                message: `Your Cozy Oven order  ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
-            });
+© Cozy Oven Store. All rights reserved.
+                `,
+            }).catch(err =>
+                console.error("Email send failed:", err)
+            );
         }
+
+        //Notification
+        createNotification({
+            title: "Payment Successful",
+            message: `Order #${order.orderId} has been paid via Hubtel`,
+            type: "order",
+            metadata: { orderId: order._id },
+        }).catch(err =>
+            console.error("Notification failed:", err)
+        );
+
+        // --- SMS HANDLING ---
+        const customerNumber = order.contactNumber;
+
+        if (customerNumber) {
+            sendSMS({
+                recipient: [customerNumber],
+                message: `Your Cozy Oven order ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
+            }).catch(err =>
+                console.error("Customer SMS failed:", err)
+            );
+        }
+
+        //Admin SMS (centralized list)
+        const ADMIN_NUMBERS = ["0249612035", "0598741086"];
+
+        if (ADMIN_NUMBERS.length > 0) {
+            sendSMS({
+                recipient: ADMIN_NUMBERS,
+                message: `New paid order received: ${order.orderId}. Please log in to the dashboard to begin processing.`,
+            }).catch(err =>
+                console.error("Admin SMS failed:", err)
+            );
+        }
+
+            //EMAIL
+//             await sendEmail({
+//                 email: userEmail,
+//                 subject: `Payment Successful - Order ${order.orderId}`,
+//                 text: `
+// Your payment was successful.
+//
+// Order ID: ${order.orderId}
+// Total Paid: GHS ${order.totalAmount}
+//
+// Thank you for ordering from Cozy Oven!
+//
+// ©Cozy Oven Store. All rights reserved
+//         `,
+//             });
+//
+//
+//             //Notifications (safe async)
+//             await createNotification({
+//                 title: "Payment Successful",
+//                 message: `Order #${order.orderId} has been paid via Hubtel`,
+//                 type: "order",
+//                 metadata: { orderId: order._id },
+//             });
+//
+//             //SMS
+//             await sendSMS({
+//                 recipient: [order.contactNumber],
+//                 message: `Your Cozy Oven order  ${order.orderId} is confirmed. Delivery will be arranged shortly. Thank you for shopping with us!`,
+//             });
+//
+//             //Admin SMS
+//             await sendSMS({
+//                 recipient: ["0249612035","0598741086w"],
+//                 message: `Hello Admin! A Cozy Oven order  ${order.orderId} is confirmed. Log in into your dashboard to start order processing. Thank you.`,
+//             });
+//
 
         return res.status(200).send("Payment Successful");
 
