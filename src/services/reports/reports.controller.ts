@@ -222,7 +222,6 @@ export const salesByCategory = async (req: AuthRequest, res: Response) => {
 };
 
 
-
 //@route GET /api/v1/dashboard/admin/reports/top-selling-products
 //desc Fetch top selling products
 //@access Private (Admin only)

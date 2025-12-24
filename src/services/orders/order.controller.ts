@@ -347,7 +347,7 @@ export const getAllOrdersAdmin = async (req: AuthRequest, res: Response): Promis
             {
                 $group: {
                     _id: null,
-                    totalOrders: { $sum: 1 },
+                    totalOrders: { $sum:  { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0]}},
                     pending: { $sum: { $cond: [{ $eq: ["$orderStatus", "pending"] }, 1, 0] } },
                     preparing: { $sum: { $cond: [{ $eq: ["$orderStatus", "preparing"] }, 1, 0] } },
                     delivered: { $sum: { $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0] } },
