@@ -25,7 +25,7 @@ export interface IOrder extends Document {
         | "delivered"
         | "cancelled";
     deliveryAddress: string;
-    city: string,
+    city?: string,
     specialInstructions?: string,
     contactNumber: string;
     paymentMethod: "hubtel" | "cash-on-delivery";
@@ -71,7 +71,7 @@ const OrderSchema = new Schema<IOrder>(
             default: "pending",
         },
         deliveryAddress: { type: String, required: true },
-        city: { type: String, required: true },
+        city: { type: String },
         specialInstructions: { type: String },
         contactNumber: { type: String, required: true },
         paymentMethod: {
