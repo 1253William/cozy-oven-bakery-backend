@@ -535,7 +535,6 @@ export const getOrderByOrderId = async (req: AuthRequest, res: Response): Promis
                 contactNumber: order.contactNumber,
                 deliveryAddress: order.deliveryAddress,
                 city: order.city,
-                specialInstructions: order.orderDetails?.pickUpDetails?.specialInstructions
             },
             items: order.items.map(item => ({
                 productId: item.productId,
@@ -545,6 +544,13 @@ export const getOrderByOrderId = async (req: AuthRequest, res: Response): Promis
                 quantity: item.quantity,
                 total: item.total
             })),
+            orderDetails: {
+                orderItems: order.orderDetails?.orderItems,
+                pickUpDetails: {
+                    pickupDate: order.orderDetails?.pickUpDetails?.pickupDate,
+                    specialInstructions: order.orderDetails?.pickUpDetails?.specialInstructions,
+                },
+            },
             pricing: {
                 subtotal: order.subtotal,
                 deliveryFee: order.deliveryFee,
