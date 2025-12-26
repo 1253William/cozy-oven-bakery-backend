@@ -82,9 +82,7 @@ async function withTimeout<T>(p: Promise<T>, ms = DB_FETCH_TIMEOUT_MS): Promise<
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-        console.log("[auth] start:", req.method, req.originalUrl);
-
-        const header = req.headers.authorization;
+       const header = req.headers.authorization;
         if (!header) {
             res.status(401).json({ success: false, message: "Unauthorized: No token provided" });
             return;

@@ -131,7 +131,7 @@ Here’s what you can do next:
 ⭐ Save favorites and get updates on special packages
 🚚 Track your orders in real time
 
-Go to My Account: https://cozyoven.store/login
+Go to My Account: https://cozyoven.store
 
 Thank you for choosing Cozy Oven — we can’t wait to bake something amazing for you! 
         
